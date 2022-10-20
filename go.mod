@@ -14,6 +14,7 @@ require (
 )
 
 require (
+	github.com/aserto-dev/errors v0.0.1 // indirect
 	github.com/aserto-dev/go-authorizer v0.0.8 // indirect
 	github.com/aserto-dev/go-directory v0.0.14 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
@@ -28,7 +29,10 @@ require (
 	github.com/lestrrat-go/jwx v1.2.10 // indirect
 	github.com/lestrrat-go/option v1.0.0 // indirect
 	github.com/magefile/mage v1.14.0 // indirect
+	github.com/mattn/go-colorable v0.1.12 // indirect
+	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/rs/zerolog v1.28.0 // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/net v0.0.0-20220909164309-bea034e7d591 // indirect
 	golang.org/x/sys v0.0.0-20220907062415-87db552b00fd // indirect

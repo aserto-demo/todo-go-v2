@@ -14,16 +14,13 @@ import (
 	"github.com/aserto-dev/aserto-go/authorizer/grpc"
 	"github.com/aserto-dev/aserto-go/client"
 
-	// aserto "github.com/aserto-dev/aserto-go/client/authorizer"
 	"github.com/aserto-dev/aserto-go/middleware"
 	"github.com/aserto-dev/aserto-go/middleware/http/std"
 	authz "github.com/aserto-dev/go-authorizer/aserto/authorizer/v2"
 
-	// "github.com/aserto-dev/go-authorizer/aserto/authorizer/v2/api"
-	// "google.golang.org/protobuf/types/known/fieldmaskpb"
-
 	"github.com/gorilla/mux"
 
+	dir "todo-go/directory"
 	"todo-go/server"
 	"todo-go/store"
 )
@@ -108,7 +105,7 @@ func main() {
 	router.HandleFunc("/todo", srv.InsertTodo).Methods("POST")
 	router.HandleFunc("/todo/{ownerID}", srv.UpdateTodo).Methods("PUT")
 	router.HandleFunc("/todo/{ownerID}", srv.DeleteTodo).Methods("DELETE")
-	// router.HandleFunc("/user/{userID}", dir.GetUser).Methods("GET")
+	router.HandleFunc("/user/{userID}", dir.GetUser).Methods("GET")
 
 	// Initialize the JWT Validator
 	jwtValidator := JWTValidator(jwksKeysUrl)
@@ -118,7 +115,6 @@ func main() {
 	// Initialize the Authorizer
 	asertoAuthorizer := AsertoAuthorizer(asertoClient, policyID, policyRoot, decision)
 	// Set up authorization middleware
-	// print(asertoAuthorizer)
 	router.Use(asertoAuthorizer.Handler)
 
 	srv.Start(router)

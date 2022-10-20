@@ -1,0 +1,4 @@
+todo.db
+.env
+go-server
+gin-bin

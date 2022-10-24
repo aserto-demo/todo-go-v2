@@ -42,17 +42,23 @@ func JWTValidator(jwksKeysURL string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			keys, err := jwk.Fetch(r.Context(), jwksKeysURL)
+			if err != nil || keys == nil {
+				log.Printf("Failed to fetch JWKs from [%s]: %s", jwksKeysURL, err)
+				http.Error(w, err.Error(), http.StatusUnauthorized)
+				return
+			}
+
 			authorizationHeader := r.Header.Get("Authorization")
 			tokenBytes := []byte(strings.Replace(authorizationHeader, "Bearer ", "", 1))
 
 			jwt.WithVerifyAuto(nil)
 			_, err = jwt.Parse(tokenBytes, jwt.WithKeySet(keys))
-
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusUnauthorized)
-			} else {
-				next.ServeHTTP(w, r)
+				return
 			}
+
+			next.ServeHTTP(w, r)
 		})
 	}
 }

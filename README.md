@@ -9,7 +9,7 @@ Create the `.env` file:
 cp .env.example .env
 ```
 
-After setting the `todo` policy instance in your Aserto account, retrieve the credentials from the policy settings tab:
+After setting the `todo` policy instance in your Aserto account, update the the `.env` to contain the following values:
 
 ```
 JWKS_URI=https://citadel.demo.aserto.com/dex/keys

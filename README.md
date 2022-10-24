@@ -13,6 +13,7 @@ After setting the `todo` policy instance in your Aserto account, retrieve the cr
 
 ```
 JWKS_URI=https://citadel.demo.aserto.com/dex/keys
+ASERTO_AUTHORIZER_SERVICE_URL=localhost:8282
 POLICY_ROOT="todoApp"
 ```
 

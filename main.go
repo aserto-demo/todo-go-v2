@@ -25,12 +25,10 @@ import (
 	"todo-go/store"
 )
 
-func AsertoAuthorizer(authClient authz.AuthorizerClient, policyID, policyRoot, decision string) *std.Middleware {
+func AsertoAuthorizer(authClient authz.AuthorizerClient, policy *middleware.Policy, policyRoot string) *std.Middleware {
 	mw := std.New(
 		authClient,
-		middleware.Policy{
-			Decision: decision,
-		},
+		*policy,
 	)
 
 	mw.Identity.JWT().FromHeader("Authorization")
@@ -77,16 +75,26 @@ func main() {
 
 	jwksKeysUrl := os.Getenv("JWKS_URI")
 
-	policyID := os.Getenv("ASERTO_POLICY_ID")
+	policyName := os.Getenv("ASERTO_POLICY_NAME")
+	policyInstanceLabel := os.Getenv("ASERTO_POLICY_INSTANCE_LABEL")
+	if policyInstanceLabel == "" {
+		policyInstanceLabel = policyName
+	}
 	policyRoot := os.Getenv("ASERTO_POLICY_ROOT")
+	insecure := (os.Getenv("ASERTO_INSECURE") != "")
 	decision := "allowed"
+
+	tenantID := os.Getenv("ASERTO_TENANT_ID")
+	apiKey := os.Getenv("ASERTO_AUTHORIZER_API_KEY")
 
 	// Initialize the Aserto Client
 	ctx := context.Background()
 	asertoClient, asertoClientErr := grpc.New(
 		ctx,
 		client.WithAddr(authorizerAddr),
-		client.WithInsecure(true),
+		client.WithTenantID(tenantID),
+		client.WithAPIKeyAuth(apiKey),
+		client.WithInsecure(insecure),
 	)
 
 	if asertoClientErr != nil {
@@ -119,7 +127,15 @@ func main() {
 	router.Use(jwtValidator)
 
 	// Initialize the Authorizer
-	asertoAuthorizer := AsertoAuthorizer(asertoClient, policyID, policyRoot, decision)
+	asertoAuthorizer := AsertoAuthorizer(asertoClient,
+		&middleware.Policy{
+			Name:          policyName,
+			Decision:      decision,
+			InstanceLabel: policyInstanceLabel,
+		},
+		policyRoot,
+	)
+
 	// Set up authorization middleware
 	router.Use(asertoAuthorizer.Handler)
 

@@ -55,12 +55,8 @@ func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	user := userObj.Properties.AsMap()
-	user["id"] = userObj.Id
-	user["name"] = userObj.DisplayName
-
 	w.Header().Add("Content-Type", "application/json")
-	encodeJSONError := json.NewEncoder(w).Encode(user)
+	encodeJSONError := json.NewEncoder(w).Encode(userAsMap(userObj))
 	if encodeJSONError != nil {
 		http.Error(w, encodeJSONError.Error(), http.StatusBadRequest)
 		return
@@ -118,4 +114,11 @@ func (d *Directory) getRelation(ctx context.Context, identifier *common.Relation
 	}
 
 	return relationResp.Results[0], nil
+}
+
+func userAsMap(user *common.Object) map[string]interface{} {
+	userMap := user.Properties.AsMap()
+	userMap["id"] = user.Id
+	userMap["name"] = user.DisplayName
+	return userMap
 }

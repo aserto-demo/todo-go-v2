@@ -75,7 +75,7 @@ func main() {
 
 	jwksKeysUrl := os.Getenv("JWKS_URI")
 
-	policyName := os.Getenv("ASERTO_POLICY_NAME")
+	policyName := os.Getenv("ASERTO_POLICY_INSTANCE_NAME")
 	policyInstanceLabel := os.Getenv("ASERTO_POLICY_INSTANCE_LABEL")
 	if policyInstanceLabel == "" {
 		policyInstanceLabel = policyName

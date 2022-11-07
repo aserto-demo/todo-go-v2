@@ -78,16 +78,20 @@ func main() {
 }
 
 type options struct {
-	authorizerAddr      string
-	authorizerKey       string
+	authorizerAddr       string
+	authorizerKey        string
+	authorizerCACertPath string
+
 	directoryAddr       string
 	directoryKey        string
-	jwksKeysUrl         string
+	directoryCACertPath string
+
+	tenantID            string
 	policyInstanceName  string
 	policyInstanceLabel string
 	policyRoot          string
-	tenantID            string
-	insecure            bool
+
+	jwksKeysUrl string
 }
 
 func loadOptions() *options {
@@ -106,16 +110,17 @@ func loadOptions() *options {
 	}
 
 	return &options{
-		authorizerAddr:      authorizerAddr,
-		authorizerKey:       os.Getenv("ASERTO_AUTHORIZER_API_KEY"),
-		directoryAddr:       directoryAddr,
-		directoryKey:        os.Getenv("ASERTO_DIRECTORY_API_KEY"),
-		jwksKeysUrl:         os.Getenv("JWKS_URI"),
-		policyInstanceName:  os.Getenv("ASERTO_POLICY_INSTANCE_NAME"),
-		policyInstanceLabel: os.Getenv("ASERTO_POLICY_INSTANCE_LABEL"),
-		policyRoot:          os.Getenv("ASERTO_POLICY_ROOT"),
-		tenantID:            os.Getenv("ASERTO_TENANT_ID"),
-		insecure:            (os.Getenv("ASERTO_INSECURE") != ""),
+		authorizerAddr:       authorizerAddr,
+		authorizerKey:        os.Getenv("ASERTO_AUTHORIZER_API_KEY"),
+		authorizerCACertPath: os.ExpandEnv("$ASERTO_AUTHORIZER_CERT_PATH"),
+		directoryAddr:        directoryAddr,
+		directoryKey:         os.Getenv("ASERTO_DIRECTORY_API_KEY"),
+		directoryCACertPath:  os.ExpandEnv("$ASERTO_DIRECTORY_CERT_PATH"),
+		jwksKeysUrl:          os.Getenv("JWKS_URI"),
+		policyInstanceName:   os.Getenv("ASERTO_POLICY_INSTANCE_NAME"),
+		policyInstanceLabel:  os.Getenv("ASERTO_POLICY_INSTANCE_LABEL"),
+		policyRoot:           os.Getenv("ASERTO_POLICY_ROOT"),
+		tenantID:             os.Getenv("ASERTO_TENANT_ID"),
 	}
 }
 
@@ -125,7 +130,7 @@ func NewAuthorizerClient(ctx context.Context, opts *options) (authz.AuthorizerCl
 		client.WithAddr(opts.authorizerAddr),
 		client.WithTenantID(opts.tenantID),
 		client.WithAPIKeyAuth(opts.authorizerKey),
-		client.WithInsecure(opts.insecure),
+		client.WithCACertPath(opts.authorizerCACertPath),
 	)
 
 	if err != nil {
@@ -141,7 +146,7 @@ func NewDirectoryReader(ctx context.Context, opts *options) (reader.ReaderClient
 		client.WithAddr(opts.directoryAddr),
 		client.WithTenantID(opts.tenantID),
 		client.WithAPIKeyAuth(opts.directoryKey),
-		client.WithInsecure(opts.insecure),
+		client.WithCACertPath(opts.directoryCACertPath),
 	)
 
 	if err != nil {

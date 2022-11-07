@@ -13,6 +13,7 @@ import (
 
 	"github.com/aserto-dev/aserto-go/authorizer/grpc"
 	"github.com/aserto-dev/aserto-go/client"
+	"github.com/aserto-dev/go-directory/aserto/directory/reader/v2"
 
 	"github.com/aserto-dev/aserto-go/middleware"
 	"github.com/aserto-dev/aserto-go/middleware/http/std"
@@ -20,7 +21,7 @@ import (
 
 	"github.com/gorilla/mux"
 
-	dir "todo-go/directory"
+	"todo-go/directory"
 	"todo-go/server"
 	"todo-go/store"
 )
@@ -68,9 +69,13 @@ func main() {
 	}
 
 	authorizerAddr := os.Getenv("ASERTO_AUTHORIZER_SERVICE_URL")
-
 	if authorizerAddr == "" {
 		authorizerAddr = "authorizer.prod.aserto.com:8443"
+	}
+
+	directoryAddr := os.Getenv("ASERTO_DIRECTORY_SERVICE_URL")
+	if directoryAddr == "" {
+		directoryAddr = "directory.prod.aserto.com:8443"
 	}
 
 	jwksKeysUrl := os.Getenv("JWKS_URI")
@@ -85,30 +90,40 @@ func main() {
 	decision := "allowed"
 
 	tenantID := os.Getenv("ASERTO_TENANT_ID")
-	apiKey := os.Getenv("ASERTO_AUTHORIZER_API_KEY")
+	authorizerKey := os.Getenv("ASERTO_AUTHORIZER_API_KEY")
+	directoryKey := os.Getenv("ASERTO_DIRECTORY_API_KEY")
 
-	// Initialize the Aserto Client
 	ctx := context.Background()
-	asertoClient, asertoClientErr := grpc.New(
-		ctx,
-		client.WithAddr(authorizerAddr),
-		client.WithTenantID(tenantID),
-		client.WithAPIKeyAuth(apiKey),
-		client.WithInsecure(insecure),
+
+	// Create an authorizer client
+	authorizerClient, err := NewAuthorizerClient(ctx, authorizerAddr, tenantID, authorizerKey, insecure)
+	if err != nil {
+		log.Fatal("Failed to create authorizer client:", err)
+	}
+
+	// Create authorization middleware
+	authorizationMiddleware := AsertoAuthorizer(authorizerClient,
+		&middleware.Policy{
+			Name:          policyName,
+			Decision:      decision,
+			InstanceLabel: policyInstanceLabel,
+		},
+		policyRoot,
 	)
 
-	if asertoClientErr != nil {
-		log.Fatal("Failed to create authorizer client:", asertoClientErr)
+	// Create a directory reader client
+	directoryReader, err := NewDirectoryReader(ctx, directoryAddr, tenantID, directoryKey, insecure)
+	if err != nil {
+		log.Fatal("Failed to create directory reader client:", err)
 	}
+
+	dir := directory.Directory{Reader: directoryReader}
 
 	// Initialize the Todo Store
 	db, dbError := store.NewStore()
 	if dbError != nil {
 		log.Fatal("Failed to create store:", dbError)
 	}
-
-	// Initialize the Directory
-	// dir := directory.Directory{DirectoryClient: asertoClient.Directory}
 
 	// Initialize the Server
 	srv := server.Server{Store: db}
@@ -121,23 +136,40 @@ func main() {
 	router.HandleFunc("/todo/{ownerID}", srv.DeleteTodo).Methods("DELETE")
 	router.HandleFunc("/user/{userID}", dir.GetUser).Methods("GET")
 
-	// Initialize the JWT Validator
-	jwtValidator := JWTValidator(jwksKeysUrl)
-	// Set up JWT validation middleware
-	router.Use(jwtValidator)
-
-	// Initialize the Authorizer
-	asertoAuthorizer := AsertoAuthorizer(asertoClient,
-		&middleware.Policy{
-			Name:          policyName,
-			Decision:      decision,
-			InstanceLabel: policyInstanceLabel,
-		},
-		policyRoot,
-	)
-
-	// Set up authorization middleware
-	router.Use(asertoAuthorizer.Handler)
+	// Add JWT validation and authorization middleware
+	router.Use(JWTValidator(jwksKeysUrl), authorizationMiddleware.Handler)
 
 	srv.Start(router)
+}
+
+func NewAuthorizerClient(ctx context.Context, addr, tenantID, apiKey string, insecure bool) (authz.AuthorizerClient, error) {
+	client, err := grpc.New(
+		ctx,
+		client.WithAddr(addr),
+		client.WithTenantID(tenantID),
+		client.WithAPIKeyAuth(apiKey),
+		client.WithInsecure(insecure),
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+func NewDirectoryReader(ctx context.Context, addr, tenantID, apiKey string, insecure bool) (reader.ReaderClient, error) {
+	conn, err := client.NewConnection(
+		ctx,
+		client.WithAddr(addr),
+		client.WithTenantID(tenantID),
+		client.WithAPIKeyAuth(apiKey),
+		client.WithInsecure(insecure),
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return reader.NewReaderClient(conn.Conn), nil
 }

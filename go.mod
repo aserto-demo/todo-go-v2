@@ -3,10 +3,11 @@ module todo-go
 go 1.17
 
 require (
-	github.com/aserto-dev/aserto-go v0.8.14-0.20221020230945-54f5fa594ce7
-	github.com/aserto-dev/go-authorizer v0.0.9
+	github.com/aserto-dev/go-aserto v0.20.1-0.20221128150133-03336c473abd
+	github.com/aserto-dev/go-authorizer v0.20.1
 	github.com/aserto-dev/go-directory v0.20.1
 	github.com/blockloop/scan v1.3.0
+	github.com/google/uuid v1.1.2
 	github.com/gorilla/mux v1.8.0
 	github.com/joho/godotenv v1.4.0
 	github.com/lestrrat-go/jwx/v2 v2.0.0-beta1
@@ -15,7 +16,7 @@ require (
 
 require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
-	github.com/goccy/go-json v0.9.6 // indirect
+	github.com/goccy/go-json v0.9.7 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.11.3 // indirect
 	github.com/lestrrat-go/backoff/v2 v2.0.8 // indirect
@@ -23,7 +24,7 @@ require (
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/httprc v1.0.1 // indirect
 	github.com/lestrrat-go/iter v1.0.2 // indirect
-	github.com/lestrrat-go/jwx v1.2.10 // indirect
+	github.com/lestrrat-go/jwx v1.2.25 // indirect
 	github.com/lestrrat-go/option v1.0.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect

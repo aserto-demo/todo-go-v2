@@ -40,9 +40,9 @@ func (s *Store) InsertTodo(todo *Todo) error {
 
 	if err != nil {
 		return err
-	} else {
-		return nil
 	}
+
+	return nil
 }
 
 func (s *Store) GetTodo(id string) (*Todo, error) {
@@ -63,9 +63,9 @@ func (s *Store) UpdateTodo(todo *Todo) error {
 
 	if err != nil {
 		return err
-	} else {
-		return nil
 	}
+
+	return nil
 }
 
 func (s *Store) DeleteTodo(id string) error {
@@ -73,9 +73,9 @@ func (s *Store) DeleteTodo(id string) error {
 
 	if err != nil {
 		return err
-	} else {
-		return nil
 	}
+
+	return nil
 }
 
 func (s *Store) loadTodos(id string) ([]Todo, error) {

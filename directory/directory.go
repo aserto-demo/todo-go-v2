@@ -37,9 +37,7 @@ type Directory struct {
 }
 
 func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
-	queryVars := mux.Vars(r)
-
-	identity := queryVars["userID"]
+	identity := mux.Vars(r)["userID"]
 
 	var dirErr *DirectoryError
 	userObj, err := d.UserFromIdentity(r.Context(), identity)

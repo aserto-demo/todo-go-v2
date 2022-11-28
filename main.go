@@ -71,9 +71,9 @@ func main() {
 	// Set up routes
 	router.HandleFunc("/todos", srv.GetTodos).Methods("GET")
 	router.HandleFunc("/todos", srv.InsertTodo).Methods("POST")
-	router.HandleFunc("/todo/{id}", srv.UpdateTodo).Methods("PUT")
-	router.HandleFunc("/todo/{id}", srv.DeleteTodo).Methods("DELETE")
-	router.HandleFunc("/user/{userID}", dir.GetUser).Methods("GET")
+	router.HandleFunc("/todos/{id}", srv.UpdateTodo).Methods("PUT")
+	router.HandleFunc("/todos/{id}", srv.DeleteTodo).Methods("DELETE")
+	router.HandleFunc("/users/{userID}", dir.GetUser).Methods("GET")
 
 	srv.Start(router)
 }

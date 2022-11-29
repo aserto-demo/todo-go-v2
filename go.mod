@@ -3,7 +3,7 @@ module todo-go
 go 1.17
 
 require (
-	github.com/aserto-dev/go-aserto v0.20.1-0.20221128150133-03336c473abd
+	github.com/aserto-dev/go-aserto v0.20.1
 	github.com/aserto-dev/go-authorizer v0.20.1
 	github.com/aserto-dev/go-directory v0.20.1
 	github.com/blockloop/scan v1.3.0

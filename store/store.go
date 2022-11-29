@@ -87,7 +87,7 @@ func (s *Store) loadTodos(id string) ([]Todo, error) {
 		args = append(args, id)
 	}
 
-	rows, err := s.DB.Query("SELECT * FROM todos", args...)
+	rows, err := s.DB.Query(query, args...)
 	switch {
 	case err != nil:
 		return nil, err

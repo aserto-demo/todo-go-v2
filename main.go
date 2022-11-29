@@ -30,14 +30,6 @@ func main() {
 	options := loadOptions()
 	ctx := context.Background()
 
-	// Create a directory reader client
-	directoryReader, err := NewDirectoryReader(ctx, options)
-	if err != nil {
-		log.Fatal("Failed to create directory reader client:", err)
-	}
-
-	dir := &directory.Directory{Reader: directoryReader}
-
 	// Initialize the Todo Store
 	db, dbError := store.NewStore()
 	if dbError != nil {
@@ -45,7 +37,7 @@ func main() {
 	}
 
 	// Initialize the Server
-	srv := server.Server{Store: db, Directory: dir}
+	srv := server.Server{Store: db}
 
 	// Create an authorizer client
 	authorizerClient, err := NewAuthorizerClient(ctx, options)
@@ -62,6 +54,14 @@ func main() {
 		},
 		options.policyRoot,
 	).WithResourceMapper(srv.TodoOwnerResourceMapper)
+
+	// Create a directory reader client
+	directoryReader, err := NewDirectoryReader(ctx, options)
+	if err != nil {
+		log.Fatal("Failed to create directory reader client:", err)
+	}
+
+	dir := &directory.Directory{Reader: directoryReader}
 
 	router := mux.NewRouter()
 

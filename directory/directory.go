@@ -37,12 +37,10 @@ type Directory struct {
 }
 
 func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
-	queryVars := mux.Vars(r)
-
-	identity := queryVars["userID"]
+	identity := mux.Vars(r)["userID"]
 
 	var dirErr *DirectoryError
-	userObj, err := d.userFromIdentity(r.Context(), identity)
+	userObj, err := d.UserFromIdentity(r.Context(), identity)
 	if err != nil {
 		if errors.As(err, &dirErr) {
 			log.Printf("%s. %s", dirErr.Message, dirErr.Err)
@@ -63,7 +61,7 @@ func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (d *Directory) userFromIdentity(ctx context.Context, identity string) (*common.Object, error) {
+func (d *Directory) UserFromIdentity(ctx context.Context, identity string) (*common.Object, error) {
 	identityObj, err := d.getObject(ctx, &common.ObjectIdentifier{Key: &identity, Type: &IdentityObjectType})
 	if err != nil {
 		return nil, &DirectoryError{Err: err, Message: "failed to get identity", StatusCode: http.StatusInternalServerError}

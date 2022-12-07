@@ -11,12 +11,12 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 
-	"github.com/aserto-dev/aserto-go/authorizer/grpc"
-	"github.com/aserto-dev/aserto-go/client"
+	"github.com/aserto-dev/go-aserto/authorizer/grpc"
+	"github.com/aserto-dev/go-aserto/client"
 	"github.com/aserto-dev/go-directory/aserto/directory/reader/v2"
 
-	"github.com/aserto-dev/aserto-go/middleware"
-	"github.com/aserto-dev/aserto-go/middleware/http/std"
+	"github.com/aserto-dev/go-aserto/middleware"
+	"github.com/aserto-dev/go-aserto/middleware/http/std"
 	authz "github.com/aserto-dev/go-authorizer/aserto/authorizer/v2"
 
 	"github.com/gorilla/mux"
@@ -29,6 +29,15 @@ import (
 func main() {
 	options := loadOptions()
 	ctx := context.Background()
+
+	// Initialize the Todo Store
+	db, dbError := store.NewStore()
+	if dbError != nil {
+		log.Fatal("Failed to create store:", dbError)
+	}
+
+	// Initialize the Server
+	srv := server.Server{Store: db}
 
 	// Create an authorizer client
 	authorizerClient, err := NewAuthorizerClient(ctx, options)
@@ -44,7 +53,7 @@ func main() {
 			InstanceLabel: options.policyInstanceLabel,
 		},
 		options.policyRoot,
-	)
+	).WithResourceMapper(srv.TodoOwnerResourceMapper)
 
 	// Create a directory reader client
 	directoryReader, err := NewDirectoryReader(ctx, options)
@@ -52,27 +61,19 @@ func main() {
 		log.Fatal("Failed to create directory reader client:", err)
 	}
 
-	dir := directory.Directory{Reader: directoryReader}
+	dir := &directory.Directory{Reader: directoryReader}
 
-	// Initialize the Todo Store
-	db, dbError := store.NewStore()
-	if dbError != nil {
-		log.Fatal("Failed to create store:", dbError)
-	}
-
-	// Initialize the Server
-	srv := server.Server{Store: db}
-
-	// Set up routes
 	router := mux.NewRouter()
-	router.HandleFunc("/todos", srv.GetTodos).Methods("GET")
-	router.HandleFunc("/todo", srv.InsertTodo).Methods("POST")
-	router.HandleFunc("/todo/{ownerID}", srv.UpdateTodo).Methods("PUT")
-	router.HandleFunc("/todo/{ownerID}", srv.DeleteTodo).Methods("DELETE")
-	router.HandleFunc("/user/{userID}", dir.GetUser).Methods("GET")
 
 	// Add JWT validation and authorization middleware
 	router.Use(JWTValidator(options.jwksKeysUrl), authorizationMiddleware.Handler)
+
+	// Set up routes
+	router.HandleFunc("/todos", srv.GetTodos).Methods("GET")
+	router.HandleFunc("/todos", srv.InsertTodo).Methods("POST")
+	router.HandleFunc("/todos/{id}", srv.UpdateTodo).Methods("PUT")
+	router.HandleFunc("/todos/{id}", srv.DeleteTodo).Methods("DELETE")
+	router.HandleFunc("/users/{userID}", dir.GetUser).Methods("GET")
 
 	srv.Start(router)
 }
@@ -157,13 +158,8 @@ func NewDirectoryReader(ctx context.Context, opts *options) (reader.ReaderClient
 }
 
 func AsertoAuthorizer(authClient authz.AuthorizerClient, policy *middleware.Policy, policyRoot string) *std.Middleware {
-	mw := std.New(
-		authClient,
-		*policy,
-	)
-
+	mw := std.New(authClient, *policy).WithPolicyFromURL(policyRoot)
 	mw.Identity.JWT().FromHeader("Authorization")
-	mw.WithPolicyFromURL(policyRoot)
 	return mw
 }
 
@@ -181,13 +177,13 @@ func JWTValidator(jwksKeysURL string) func(next http.Handler) http.Handler {
 			tokenBytes := []byte(strings.Replace(authorizationHeader, "Bearer ", "", 1))
 
 			jwt.WithVerifyAuto(nil)
-			_, err = jwt.Parse(tokenBytes, jwt.WithKeySet(keys))
+			token, err := jwt.Parse(tokenBytes, jwt.WithKeySet(keys))
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusUnauthorized)
 				return
 			}
 
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), "subject", token.Subject())))
 		})
 	}
 }

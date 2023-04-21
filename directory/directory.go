@@ -11,6 +11,7 @@ import (
 	"github.com/aserto-dev/go-directory/aserto/directory/common/v2"
 	"github.com/aserto-dev/go-directory/aserto/directory/reader/v2"
 	"github.com/gorilla/mux"
+	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -46,11 +47,11 @@ func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
 			log.Printf("%s. %s", dirErr.Message, dirErr.Err)
 			http.Error(w, dirErr.Message, dirErr.StatusCode)
 			return
-		} else {
-			log.Printf("Failed to get user: %s", err)
-			http.Error(w, "failed to get user", http.StatusInternalServerError)
-			return
 		}
+
+		log.Printf("Failed to get user: %s", err)
+		http.Error(w, "failed to get user", http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Add("Content-Type", "application/json")
@@ -62,32 +63,24 @@ func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Directory) UserFromIdentity(ctx context.Context, identity string) (*common.Object, error) {
-	identityObj, err := d.getObject(ctx, &common.ObjectIdentifier{Key: &identity, Type: &IdentityObjectType})
-	if err != nil {
-		return nil, &DirectoryError{Err: err, Message: "failed to get identity", StatusCode: http.StatusInternalServerError}
-	}
-
-	relation, err := d.getRelation(
-		ctx,
-		&common.RelationIdentifier{
-			Subject:  &common.ObjectIdentifier{Type: &UserObjectType},
-			Relation: &common.RelationTypeIdentifier{Name: &IdentifierRelationType, ObjectType: &IdentityObjectType},
-			Object:   &common.ObjectIdentifier{Id: &identityObj.Id},
+	resp, err := d.Reader.GetRelation(ctx, &reader.GetRelationRequest{
+		Param: &common.RelationIdentifier{
+			Subject:  &common.ObjectIdentifier{Type: proto.String("user")},
+			Relation: &common.RelationTypeIdentifier{Name: proto.String("identifier"), ObjectType: proto.String("identity")},
+			Object:   &common.ObjectIdentifier{Type: proto.String("identity"), Key: &identity},
 		},
-	)
+		WithObjects: proto.Bool(true),
+	})
 	switch {
-	case errors.Is(err, ErrNotFound):
-		return nil, &DirectoryError{Err: err, Message: fmt.Sprintf("no user with identity [%s]", identity), StatusCode: http.StatusNotFound}
 	case err != nil:
-		return nil, &DirectoryError{Err: err, Message: "failed to get identity relations", StatusCode: http.StatusInternalServerError}
+		log.Printf("Failed to get relations for identity [%+v]: %s", identity, err)
+		return nil, err
+	case len(resp.Results) == 0:
+		log.Printf("No relations found for identity [%+v]", identity)
+		return nil, ErrNotFound
 	}
 
-	userObj, err := d.getObject(ctx, &common.ObjectIdentifier{Id: relation.Subject.Id})
-	if err != nil {
-		return nil, &DirectoryError{Err: err, Message: "failed to get user", StatusCode: http.StatusInternalServerError}
-	}
-
-	return userObj, nil
+	return resp.Objects[*resp.Results[0].Subject.Id], nil
 }
 
 func (d *Directory) getObject(ctx context.Context, identifier *common.ObjectIdentifier) (*common.Object, error) {
@@ -116,7 +109,7 @@ func (d *Directory) getRelation(ctx context.Context, identifier *common.Relation
 
 func userAsMap(user *common.Object) map[string]interface{} {
 	userMap := user.Properties.AsMap()
-	userMap["id"] = user.Id
+	userMap["key"] = user.Key
 	userMap["name"] = user.DisplayName
 	return userMap
 }

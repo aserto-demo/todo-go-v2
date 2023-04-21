@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"todo-go/directory"
 	"todo-go/store"
 
 	"github.com/google/uuid"
@@ -14,7 +15,8 @@ import (
 type Todo = store.Todo
 
 type Server struct {
-	Store *store.Store
+	Store     *store.Store
+	Directory *directory.Directory
 }
 
 func (s *Server) GetTodos(w http.ResponseWriter, r *http.Request) {
@@ -43,8 +45,13 @@ func (s *Server) InsertTodo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ownerIdentity := r.Context().Value("subject").(string)
+	owner, err := s.Directory.UserFromIdentity(r.Context(), ownerIdentity)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
 	todo.ID = uuid.New().String()
-	todo.OwnerID = r.Context().Value("subject").(string)
+	todo.OwnerID = owner.Key
 
 	if err := s.Store.InsertTodo(&todo); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

@@ -10,8 +10,8 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
+	"google.golang.org/grpc"
 
-	"github.com/aserto-dev/go-aserto/authorizer/grpc"
 	"github.com/aserto-dev/go-aserto/client"
 	"github.com/aserto-dev/go-directory/aserto/directory/reader/v2"
 
@@ -36,11 +36,19 @@ func main() {
 		log.Fatal("Failed to create store:", dbError)
 	}
 
+	// Create a directory reader client
+	directoryReader, err := NewDirectoryReader(ctx, &options.directory)
+	if err != nil {
+		log.Fatal("Failed to create directory reader client:", err)
+	}
+
+	dir := &directory.Directory{Reader: directoryReader}
+
 	// Initialize the Server
-	srv := server.Server{Store: db}
+	srv := server.Server{Store: db, Directory: dir}
 
 	// Create an authorizer client
-	authorizerClient, err := NewAuthorizerClient(ctx, options)
+	authorizerClient, err := NewAuthorizerClient(ctx, &options.authorizer)
 	if err != nil {
 		log.Fatal("Failed to create authorizer client:", err)
 	}
@@ -54,14 +62,6 @@ func main() {
 		},
 		options.policyRoot,
 	).WithResourceMapper(srv.TodoOwnerResourceMapper)
-
-	// Create a directory reader client
-	directoryReader, err := NewDirectoryReader(ctx, options)
-	if err != nil {
-		log.Fatal("Failed to create directory reader client:", err)
-	}
-
-	dir := &directory.Directory{Reader: directoryReader}
 
 	router := mux.NewRouter()
 
@@ -79,15 +79,9 @@ func main() {
 }
 
 type options struct {
-	authorizerAddr       string
-	authorizerKey        string
-	authorizerCACertPath string
+	authorizer client.Config
+	directory  client.Config
 
-	directoryAddr       string
-	directoryKey        string
-	directoryCACertPath string
-
-	tenantID            string
 	policyInstanceName  string
 	policyInstanceLabel string
 	policyRoot          string
@@ -111,50 +105,55 @@ func loadOptions() *options {
 	}
 
 	return &options{
-		authorizerAddr:       authorizerAddr,
-		authorizerKey:        os.Getenv("ASERTO_AUTHORIZER_API_KEY"),
-		authorizerCACertPath: os.ExpandEnv("$ASERTO_AUTHORIZER_CERT_PATH"),
-		directoryAddr:        directoryAddr,
-		directoryKey:         os.Getenv("ASERTO_DIRECTORY_API_KEY"),
-		directoryCACertPath:  os.ExpandEnv("$ASERTO_DIRECTORY_CERT_PATH"),
-		jwksKeysUrl:          os.Getenv("JWKS_URI"),
-		policyInstanceName:   os.Getenv("ASERTO_POLICY_INSTANCE_NAME"),
-		policyInstanceLabel:  os.Getenv("ASERTO_POLICY_INSTANCE_LABEL"),
-		policyRoot:           os.Getenv("ASERTO_POLICY_ROOT"),
-		tenantID:             os.Getenv("ASERTO_TENANT_ID"),
+		authorizer: client.Config{
+			Address:    authorizerAddr,
+			APIKey:     os.Getenv("ASERTO_AUTHORIZER_API_KEY"),
+			CACertPath: os.ExpandEnv(os.Getenv("ASERTO_AUTHORIZER_CERT_PATH")),
+			TenantID:   os.Getenv("ASERTO_TENANT_ID"),
+		},
+		directory: client.Config{
+			Address:    directoryAddr,
+			APIKey:     os.Getenv("ASERTO_DIRECTORY_API_KEY"),
+			CACertPath: os.ExpandEnv(os.Getenv("ASERTO_DIRECTORY_GRPC_CERT_PATH")),
+			TenantID:   os.Getenv("ASERTO_TENANT_ID"),
+		},
+		jwksKeysUrl:         os.Getenv("JWKS_URI"),
+		policyInstanceName:  os.Getenv("ASERTO_POLICY_INSTANCE_NAME"),
+		policyInstanceLabel: os.Getenv("ASERTO_POLICY_INSTANCE_LABEL"),
+		policyRoot:          os.Getenv("ASERTO_POLICY_ROOT"),
 	}
 }
 
-func NewAuthorizerClient(ctx context.Context, opts *options) (authz.AuthorizerClient, error) {
-	client, err := grpc.New(
-		ctx,
-		client.WithAddr(opts.authorizerAddr),
-		client.WithTenantID(opts.tenantID),
-		client.WithAPIKeyAuth(opts.authorizerKey),
-		client.WithCACertPath(opts.authorizerCACertPath),
-	)
-
+func NewAuthorizerClient(ctx context.Context, cfg *client.Config) (authz.AuthorizerClient, error) {
+	conn, err := newConnection(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	return client, nil
+	return authz.NewAuthorizerClient(conn), nil
 }
 
-func NewDirectoryReader(ctx context.Context, opts *options) (reader.ReaderClient, error) {
-	conn, err := client.NewConnection(
-		ctx,
-		client.WithAddr(opts.directoryAddr),
-		client.WithTenantID(opts.tenantID),
-		client.WithAPIKeyAuth(opts.directoryKey),
-		client.WithCACertPath(opts.directoryCACertPath),
-	)
-
+func NewDirectoryReader(ctx context.Context, cfg *client.Config) (reader.ReaderClient, error) {
+	conn, err := newConnection(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	return reader.NewReaderClient(conn.Conn), nil
+	return reader.NewReaderClient(conn), nil
+}
+
+func newConnection(ctx context.Context, cfg *client.Config) (grpc.ClientConnInterface, error) {
+	connectionOpts, err := cfg.ToConnectionOptions(client.NewDialOptionsProvider())
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := client.NewConnection(ctx, connectionOpts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return conn.Conn, nil
 }
 
 func AsertoAuthorizer(authClient authz.AuthorizerClient, policy *middleware.Policy, policyRoot string) *std.Middleware {

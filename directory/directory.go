@@ -63,24 +63,29 @@ func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Directory) UserFromIdentity(ctx context.Context, identity string) (*common.Object, error) {
-	resp, err := d.Reader.GetRelation(ctx, &reader.GetRelationRequest{
+	relResp, err := d.Reader.GetRelation(ctx, &reader.GetRelationRequest{
 		Param: &common.RelationIdentifier{
 			Subject:  &common.ObjectIdentifier{Type: proto.String("user")},
 			Relation: &common.RelationTypeIdentifier{Name: proto.String("identifier"), ObjectType: proto.String("identity")},
 			Object:   &common.ObjectIdentifier{Type: proto.String("identity"), Key: &identity},
 		},
-		WithObjects: proto.Bool(true),
 	})
 	switch {
 	case err != nil:
 		log.Printf("Failed to get relations for identity [%+v]: %s", identity, err)
 		return nil, err
-	case len(resp.Results) == 0:
+	case len(relResp.Results) == 0:
 		log.Printf("No relations found for identity [%+v]", identity)
 		return nil, ErrNotFound
 	}
 
-	return resp.Objects[*resp.Results[0].Subject.Id], nil
+	objResp, err := d.Reader.GetObject(ctx, &reader.GetObjectRequest{Param: relResp.Results[0].Subject})
+	if err != nil {
+		log.Printf("Failed to get user object [%+v]: %s", relResp.Results[0].Subject, err)
+		return nil, err
+	}
+
+	return objResp.Result, nil
 }
 
 func (d *Directory) getObject(ctx context.Context, identifier *common.ObjectIdentifier) (*common.Object, error) {

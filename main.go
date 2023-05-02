@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/avast/retry-go"
 	"github.com/joho/godotenv"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
@@ -36,19 +37,35 @@ func main() {
 		log.Fatal("Failed to create store:", dbError)
 	}
 
-	// Create a directory reader client
-	directoryReader, err := NewDirectoryReader(ctx, &options.directory)
+	var directoryReader reader.ReaderClient
+	var err error
+	err = retry.Do(func() error {
+		// Create a directory reader client
+		directoryReader, err = NewDirectoryReader(ctx, &options.directory)
+		if err != nil {
+			log.Println("Retry: Failed to create directory client:", err)
+			return err
+		}
+		return nil
+	})
 	if err != nil {
 		log.Fatal("Failed to create directory reader client:", err)
 	}
-
 	dir := &directory.Directory{Reader: directoryReader}
 
 	// Initialize the Server
 	srv := server.Server{Store: db, Directory: dir}
 
-	// Create an authorizer client
-	authorizerClient, err := NewAuthorizerClient(ctx, &options.authorizer)
+	var authorizerClient authz.AuthorizerClient
+	err = retry.Do(func() error {
+		// Create an authorizer client
+		authorizerClient, err = NewAuthorizerClient(ctx, &options.authorizer)
+		if err != nil {
+			log.Println("Retry: Failed to create authorizer client:", err)
+			return err
+		}
+		return nil
+	})
 	if err != nil {
 		log.Fatal("Failed to create authorizer client:", err)
 	}

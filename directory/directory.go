@@ -38,11 +38,18 @@ type Directory struct {
 }
 
 func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
-	identity := mux.Vars(r)["userID"]
+	userKey := mux.Vars(r)["userID"]
+	callerPID := r.Context().Value("subject").(string)
 
-	var dirErr *DirectoryError
-	userObj, err := d.UserFromIdentity(r.Context(), identity)
+	var userObj *common.Object
+	var err error
+	if userKey == callerPID {
+		userObj, err = d.UserFromIdentity(r.Context(), userKey)
+	} else {
+		userObj, err = d.getObject(r.Context(), &common.ObjectIdentifier{Type: proto.String("user"), Key: &userKey})
+	}
 	if err != nil {
+		var dirErr *DirectoryError
 		if errors.As(err, &dirErr) {
 			log.Printf("%s. %s", dirErr.Message, dirErr.Err)
 			http.Error(w, dirErr.Message, dirErr.StatusCode)

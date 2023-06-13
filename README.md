@@ -33,6 +33,8 @@ ASERTO_DIRECTORY_GRPC_CERT_PATH='$HOME/.config/topaz/certs/grpc-ca.crt'
 # Aserto hosted authorizer
 #
 # To run the server using an Aserto hosted authorizer, the following variables are required:
+# ASERTO_AUTHORIZER_SERVICE_URL=authorizer.prod.aserto.com:8443
+# ASERTO_DIRECTORY_SERVICE_URL=directory.prod.aserto.com:8443
 # ASERTO_TENANT_ID={Your Aserto Tenant ID UUID}
 # ASERTO_AUTHORIZER_API_KEY={Your Authorizer API Key}
 # ASERTO_DIRECTORY_API_KEY={Your Directory (read-only) API Key}

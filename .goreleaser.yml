@@ -1,0 +1,56 @@
+project_name: todo-go
+
+env:
+  - REGISTRY=ghcr.io
+  - ORG=aserto-demo
+  - REPO=todo-go-v2
+
+before:
+  hooks:
+
+builds:
+  -
+    id: build
+    main: ./main.go
+    binary: "{{.ProjectName}}"
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=1
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s
+      - -w
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
+archives:
+  - format: zip
+    rlcp: true
+    files:
+      - LICENSE.md
+      - README.md
+    name_template: >-
+      {{.ProjectName}}{{ .Version }}_{{ .Os }}_{{- if eq .Arch "amd64" }}x86_64{{- else }}{{ .Arch }}{{ end }}
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ .Tag }}"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+
+release:
+  disable: true

@@ -1,0 +1,78 @@
+version: '3'
+
+env:
+  ORG: "aserto-demo"
+  REPO: "todo-go-v2"
+  BIN: "todo-go" 
+
+tasks:
+  build:
+    cmds:
+      - .ext/gobin/goreleaser build --clean --single-target --snapshot
+    preconditions:
+      - test -f .ext/gobin/goreleaser
+
+  build-all:
+    cmds:
+      - .ext/gobin/goreleaser build --clean --snapshot
+    preconditions:
+      - test -f .ext/gobin/goreleaser
+
+  lint:
+    cmds:
+      - .ext/gobin/golangci-lint run
+    preconditions:
+      - test -f .ext/gobin/golangci-lint
+  
+  test:
+    cmds:
+      - .ext/gobin/gotestsum --format short-verbose -- -count=1 -v ./...
+    preconditions:
+      - test -f .ext/gobin/gotestsum
+  
+  run:
+    cmds:
+      - ./dist/build_{{OS}}_{{ARCH}}/$BIN {{.CLI_ARGS}}
+  
+  clean:
+    cmds:
+      - rm -rf ./dist
+      - rm -rf ./.ext
+  
+  deps:
+    cmds:
+      - task: install-goreleaser
+      - task: install-golangci-lint
+      - task: install-gotestsum
+  
+  install-goreleaser:
+    internal: true
+    cmds:
+      - task: go-install
+        vars:
+          PACKAGE: github.com/goreleaser/goreleaser
+          VERSION: v1.18.2
+
+  install-golangci-lint:
+    internal: true
+    cmds:
+      - task: go-install
+        vars:
+          PACKAGE: github.com/golangci/golangci-lint/cmd/golangci-lint
+          VERSION: v1.52.2
+
+  install-gotestsum:
+    internal: true
+    cmds:
+      - task: go-install
+        vars:
+          PACKAGE: gotest.tools/gotestsum
+          VERSION: v1.10.0
+
+  go-install:
+    internal: true
+    env:
+      GOBIN: "{{.ROOT_DIR}}/.ext/gobin"
+    cmds:
+      - go install {{.PACKAGE}}@{{.VERSION}}
+

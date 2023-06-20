@@ -7,24 +7,22 @@ import (
 	"os"
 	"strings"
 
+	"todo-go/directory"
+	"todo-go/server"
+	"todo-go/store"
+
+	"github.com/aserto-dev/go-aserto/client"
+	"github.com/aserto-dev/go-aserto/middleware"
+	"github.com/aserto-dev/go-aserto/middleware/http/std"
+	authz "github.com/aserto-dev/go-authorizer/aserto/authorizer/v2"
+	dsr "github.com/aserto-dev/go-directory/aserto/directory/reader/v2"
+
 	"github.com/avast/retry-go"
+	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"google.golang.org/grpc"
-
-	"github.com/aserto-dev/go-aserto/client"
-	"github.com/aserto-dev/go-directory/aserto/directory/reader/v2"
-
-	"github.com/aserto-dev/go-aserto/middleware"
-	"github.com/aserto-dev/go-aserto/middleware/http/std"
-	authz "github.com/aserto-dev/go-authorizer/aserto/authorizer/v2"
-
-	"github.com/gorilla/mux"
-
-	"todo-go/directory"
-	"todo-go/server"
-	"todo-go/store"
 )
 
 func main() {
@@ -37,7 +35,7 @@ func main() {
 		log.Fatal("Failed to create store:", dbError)
 	}
 
-	var directoryReader reader.ReaderClient
+	var directoryReader dsr.ReaderClient
 	var err error
 	err = retry.Do(func() error {
 		// Create a directory reader client
@@ -83,7 +81,7 @@ func main() {
 	router := mux.NewRouter()
 
 	// Add JWT validation and authorization middleware
-	router.Use(JWTValidator(options.jwksKeysUrl), authorizationMiddleware.Handler)
+	router.Use(JWTValidator(options.jwksKeysURL), authorizationMiddleware.Handler)
 
 	// Set up routes
 	router.HandleFunc("/todos", srv.GetTodos).Methods("GET")
@@ -103,7 +101,7 @@ type options struct {
 	policyInstanceLabel string
 	policyRoot          string
 
-	jwksKeysUrl string
+	jwksKeysURL string
 }
 
 func loadOptions() *options {
@@ -121,6 +119,9 @@ func loadOptions() *options {
 		directoryAddr = "directory.prod.aserto.com:8443"
 	}
 
+	log.Printf("Authorizer: %s\n", authorizerAddr)
+	log.Printf("Directory:  %s\n", directoryAddr)
+
 	return &options{
 		authorizer: client.Config{
 			Address:    authorizerAddr,
@@ -134,7 +135,7 @@ func loadOptions() *options {
 			CACertPath: os.ExpandEnv(os.Getenv("ASERTO_DIRECTORY_GRPC_CERT_PATH")),
 			TenantID:   os.Getenv("ASERTO_TENANT_ID"),
 		},
-		jwksKeysUrl:         os.Getenv("JWKS_URI"),
+		jwksKeysURL:         os.Getenv("JWKS_URI"),
 		policyInstanceName:  os.Getenv("ASERTO_POLICY_INSTANCE_NAME"),
 		policyInstanceLabel: os.Getenv("ASERTO_POLICY_INSTANCE_LABEL"),
 		policyRoot:          os.Getenv("ASERTO_POLICY_ROOT"),
@@ -150,13 +151,13 @@ func NewAuthorizerClient(ctx context.Context, cfg *client.Config) (authz.Authori
 	return authz.NewAuthorizerClient(conn), nil
 }
 
-func NewDirectoryReader(ctx context.Context, cfg *client.Config) (reader.ReaderClient, error) {
+func NewDirectoryReader(ctx context.Context, cfg *client.Config) (dsr.ReaderClient, error) {
 	conn, err := newConnection(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	return reader.NewReaderClient(conn), nil
+	return dsr.NewReaderClient(conn), nil
 }
 
 func newConnection(ctx context.Context, cfg *client.Config) (grpc.ClientConnInterface, error) {

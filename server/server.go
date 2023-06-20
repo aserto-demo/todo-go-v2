@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"todo-go/directory"
 	"todo-go/store"
@@ -49,6 +50,7 @@ func (s *Server) InsertTodo(w http.ResponseWriter, r *http.Request) {
 	owner, err := s.Directory.UserFromIdentity(r.Context(), ownerIdentity)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 	todo.ID = uuid.New().String()
 	todo.OwnerID = owner.Key
@@ -123,8 +125,12 @@ func (s *Server) Start(handler http.Handler) {
 	log.Println("Staring server on 0.0.0.0:3001")
 
 	srv := http.Server{
-		Handler: cors(handler),
-		Addr:    "0.0.0.0:3001",
+		Handler:           cors(handler),
+		Addr:              "0.0.0.0:3001",
+		ReadTimeout:       1 * time.Second,
+		WriteTimeout:      1 * time.Second,
+		IdleTimeout:       30 * time.Second,
+		ReadHeaderTimeout: 2 * time.Second,
 	}
 	log.Fatal(srv.ListenAndServe())
 }

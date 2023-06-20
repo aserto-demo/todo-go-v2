@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"todo-go/common"
 	"todo-go/directory"
 	"todo-go/store"
 
@@ -46,7 +47,12 @@ func (s *Server) InsertTodo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ownerIdentity := r.Context().Value("subject").(string)
+	ownerIdentity, ok := r.Context().Value(common.ContextKeySubject).(string)
+	if !ok {
+		http.Error(w, "context does not contain a subject value", http.StatusExpectationFailed)
+		return
+	}
+
 	owner, err := s.Directory.UserFromIdentity(r.Context(), ownerIdentity)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

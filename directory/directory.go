@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"todo-go/common"
 
 	dsc "github.com/aserto-dev/go-directory/aserto/directory/common/v2"
 	dsr "github.com/aserto-dev/go-directory/aserto/directory/reader/v2"
@@ -40,7 +41,11 @@ type Directory struct {
 
 func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
 	userKey := mux.Vars(r)["userID"]
-	callerPID := r.Context().Value("subject").(string)
+	callerPID, ok := r.Context().Value(common.ContextKeySubject).(string)
+	if !ok {
+		http.Error(w, "context does not contain a subject value", http.StatusExpectationFailed)
+		return
+	}
 
 	var userObj *dsc.Object
 	var err error

@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"todo-go/common"
 	"todo-go/directory"
 	"todo-go/server"
 	"todo-go/store"
@@ -200,7 +201,7 @@ func JWTValidator(jwksKeysURL string) func(next http.Handler) http.Handler {
 				return
 			}
 
-			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), "subject", token.Subject())))
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), common.ContextKeySubject, token.Subject())))
 		})
 	}
 }

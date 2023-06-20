@@ -38,6 +38,7 @@ tasks:
     cmds:
       - rm -rf ./dist
       - rm -rf ./.ext
+      - rm -f todo.db
   
   deps:
     cmds:
@@ -59,7 +60,7 @@ tasks:
       - task: go-install
         vars:
           PACKAGE: github.com/golangci/golangci-lint/cmd/golangci-lint
-          VERSION: v1.52.2
+          VERSION: v1.53.2
 
   install-gotestsum:
     internal: true

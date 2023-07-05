@@ -1,4 +1,11 @@
-todo.db
-go-server
-gin-bin
+.DS_Store
+.dev/
+.ext/
+.vscode/launch.json
 .env
+
+dist/
+
+todo.db
+
+todo-go

@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"todo-go/common"
 
-	"github.com/aserto-dev/go-directory/aserto/directory/common/v2"
-	"github.com/aserto-dev/go-directory/aserto/directory/reader/v2"
+	dsc "github.com/aserto-dev/go-directory/aserto/directory/common/v2"
+	dsr "github.com/aserto-dev/go-directory/aserto/directory/reader/v2"
+
 	"github.com/gorilla/mux"
 	"google.golang.org/protobuf/proto"
 )
@@ -34,19 +36,23 @@ func (e *DirectoryError) Error() string {
 }
 
 type Directory struct {
-	Reader reader.ReaderClient
+	Reader dsr.ReaderClient
 }
 
 func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
 	userKey := mux.Vars(r)["userID"]
-	callerPID := r.Context().Value("subject").(string)
+	callerPID, ok := r.Context().Value(common.ContextKeySubject).(string)
+	if !ok {
+		http.Error(w, "context does not contain a subject value", http.StatusExpectationFailed)
+		return
+	}
 
-	var userObj *common.Object
+	var userObj *dsc.Object
 	var err error
 	if userKey == callerPID {
 		userObj, err = d.UserFromIdentity(r.Context(), userKey)
 	} else {
-		userObj, err = d.getObject(r.Context(), &common.ObjectIdentifier{Type: proto.String("user"), Key: &userKey})
+		userObj, err = d.getObject(r.Context(), &dsc.ObjectIdentifier{Type: proto.String("user"), Key: &userKey})
 	}
 	if err != nil {
 		var dirErr *DirectoryError
@@ -69,12 +75,12 @@ func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (d *Directory) UserFromIdentity(ctx context.Context, identity string) (*common.Object, error) {
-	relResp, err := d.Reader.GetRelation(ctx, &reader.GetRelationRequest{
-		Param: &common.RelationIdentifier{
-			Subject:  &common.ObjectIdentifier{Type: proto.String("user")},
-			Relation: &common.RelationTypeIdentifier{Name: proto.String("identifier"), ObjectType: proto.String("identity")},
-			Object:   &common.ObjectIdentifier{Type: proto.String("identity"), Key: &identity},
+func (d *Directory) UserFromIdentity(ctx context.Context, identity string) (*dsc.Object, error) {
+	relResp, err := d.Reader.GetRelation(ctx, &dsr.GetRelationRequest{
+		Param: &dsc.RelationIdentifier{
+			Subject:  &dsc.ObjectIdentifier{Type: proto.String("user")},
+			Relation: &dsc.RelationTypeIdentifier{Name: proto.String("identifier"), ObjectType: proto.String("identity")},
+			Object:   &dsc.ObjectIdentifier{Type: proto.String("identity"), Key: &identity},
 		},
 	})
 	switch {
@@ -86,7 +92,7 @@ func (d *Directory) UserFromIdentity(ctx context.Context, identity string) (*com
 		return nil, ErrNotFound
 	}
 
-	objResp, err := d.Reader.GetObject(ctx, &reader.GetObjectRequest{Param: relResp.Results[0].Subject})
+	objResp, err := d.Reader.GetObject(ctx, &dsr.GetObjectRequest{Param: relResp.Results[0].Subject})
 	if err != nil {
 		log.Printf("Failed to get user object [%+v]: %s", relResp.Results[0].Subject, err)
 		return nil, err
@@ -95,8 +101,8 @@ func (d *Directory) UserFromIdentity(ctx context.Context, identity string) (*com
 	return objResp.Result, nil
 }
 
-func (d *Directory) getObject(ctx context.Context, identifier *common.ObjectIdentifier) (*common.Object, error) {
-	resp, err := d.Reader.GetObject(ctx, &reader.GetObjectRequest{Param: identifier})
+func (d *Directory) getObject(ctx context.Context, identifier *dsc.ObjectIdentifier) (*dsc.Object, error) {
+	resp, err := d.Reader.GetObject(ctx, &dsr.GetObjectRequest{Param: identifier})
 	if err != nil {
 		log.Printf("Failed to get object[%+v]: %s", identifier, err)
 		return nil, err
@@ -105,8 +111,9 @@ func (d *Directory) getObject(ctx context.Context, identifier *common.ObjectIden
 	return resp.Result, nil
 }
 
-func (d *Directory) getRelation(ctx context.Context, identifier *common.RelationIdentifier) (*common.Relation, error) {
-	relationResp, err := d.Reader.GetRelations(ctx, &reader.GetRelationsRequest{Param: identifier})
+// nolint: unused
+func (d *Directory) getRelation(ctx context.Context, identifier *dsc.RelationIdentifier) (*dsc.Relation, error) {
+	relationResp, err := d.Reader.GetRelations(ctx, &dsr.GetRelationsRequest{Param: identifier})
 	switch {
 	case err != nil:
 		log.Printf("Failed to get relations for [%+v]: %s", identifier, err)
@@ -119,7 +126,7 @@ func (d *Directory) getRelation(ctx context.Context, identifier *common.Relation
 	return relationResp.Results[0], nil
 }
 
-func userAsMap(user *common.Object) map[string]interface{} {
+func userAsMap(user *dsc.Object) map[string]interface{} {
 	userMap := user.Properties.AsMap()
 	userMap["key"] = user.Key
 	userMap["name"] = user.DisplayName

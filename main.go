@@ -36,21 +36,21 @@ func main() {
 		log.Fatal("Failed to create store:", dbError)
 	}
 
-	var directoryReader dsr.ReaderClient
+	var dir *directory.Directory
 	var err error
 	err = retry.Do(func() error {
 		// Create a directory reader client
-		directoryReader, err = NewDirectoryReader(ctx, &options.directory)
+		conn, err := newConnection(ctx, &options.directory)
 		if err != nil {
-			log.Println("Retry: Failed to create directory client:", err)
+			log.Println("Retry: Failed to create directory connection:", err)
 			return err
 		}
+		dir = directory.NewDirectory(conn)
 		return nil
 	})
 	if err != nil {
 		log.Fatal("Failed to create directory reader client:", err)
 	}
-	dir := &directory.Directory{Reader: directoryReader}
 
 	// Initialize the Server
 	srv := server.Server{Store: db, Directory: dir}

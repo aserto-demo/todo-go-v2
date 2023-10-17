@@ -11,8 +11,10 @@ import (
 
 	dsc "github.com/aserto-dev/go-directory/aserto/directory/common/v2"
 	dsr "github.com/aserto-dev/go-directory/aserto/directory/reader/v2"
+	dsw "github.com/aserto-dev/go-directory/aserto/directory/writer/v2"
 
 	"github.com/gorilla/mux"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -37,6 +39,14 @@ func (e *DirectoryError) Error() string {
 
 type Directory struct {
 	Reader dsr.ReaderClient
+	Writer dsw.WriterClient
+}
+
+func NewDirectory(conn grpc.ClientConnInterface) *Directory {
+	return &Directory{
+		Reader: dsr.NewReaderClient(conn),
+		Writer: dsw.NewWriterClient(conn),
+	}
 }
 
 func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
@@ -99,6 +109,33 @@ func (d *Directory) UserFromIdentity(ctx context.Context, identity string) (*dsc
 	}
 
 	return objResp.Result, nil
+}
+
+func (d *Directory) AddTodo(ctx context.Context, id, owner string) error {
+	if _, err := d.Writer.SetRelation(ctx, &dsw.SetRelationRequest{
+		Relation: &dsc.Relation{
+			Subject:  &dsc.ObjectIdentifier{Type: proto.String("user"), Key: &owner},
+			Relation: "owner",
+			Object:   &dsc.ObjectIdentifier{Type: proto.String("todo"), Key: &id},
+		},
+	}); err != nil {
+		log.Printf("Failed to set owner relation [%+v]: %s", id, err)
+		return err
+	}
+
+	return nil
+}
+
+func (d *Directory) DeleteTodo(ctx context.Context, id string) error {
+	if _, err := d.Writer.DeleteObject(ctx, &dsw.DeleteObjectRequest{
+		Param:         &dsc.ObjectIdentifier{Type: proto.String("todo"), Key: &id},
+		WithRelations: proto.Bool(true),
+	}); err != nil {
+		log.Printf("Failed to delete todo object [%+v]: %s", id, err)
+		return err
+	}
+
+	return nil
 }
 
 func (d *Directory) getObject(ctx context.Context, identifier *dsc.ObjectIdentifier) (*dsc.Object, error) {

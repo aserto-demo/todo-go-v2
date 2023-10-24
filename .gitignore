@@ -4,6 +4,8 @@
 .vscode/launch.json
 .env
 
+go.work.sum
+
 dist/
 
 todo.db

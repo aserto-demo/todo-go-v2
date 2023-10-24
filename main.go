@@ -70,11 +70,12 @@ func main() {
 	}
 
 	// Create authorization middleware
-	authorizationMiddleware := AsertoAuthorizer(authorizerClient,
+	mw := AsertoAuthorizer(authorizerClient,
 		&middleware.Policy{
 			Name:          options.policyInstanceName,
 			Decision:      "allowed",
 			InstanceLabel: options.policyInstanceLabel,
+			Root:          options.policyRoot,
 		},
 		options.policyRoot,
 	).WithResourceMapper(srv.TodoOwnerResourceMapper)
@@ -82,14 +83,22 @@ func main() {
 	router := mux.NewRouter()
 
 	// Add JWT validation and authorization middleware
-	router.Use(JWTValidator(options.jwksKeysURL), authorizationMiddleware.Handler)
+	router.Use(JWTValidator(options.jwksKeysURL))
 
 	// Set up routes
-	router.HandleFunc("/todos", srv.GetTodos).Methods("GET")
-	router.HandleFunc("/todos", srv.InsertTodo).Methods("POST")
-	router.HandleFunc("/todos/{id}", srv.UpdateTodo).Methods("PUT")
-	router.HandleFunc("/todos/{id}", srv.DeleteTodo).Methods("DELETE")
-	router.HandleFunc("/users/{userID}", dir.GetUser).Methods("GET")
+	router.Handle("/users/{userID}", mw.HandlerFunc(dir.GetUser)).Methods("GET")
+
+	router.Handle("/todos", mw.HandlerFunc(srv.GetTodos)).Methods("GET")
+	router.Handle("/todos", mw.HandlerFunc(srv.InsertTodo)).Methods("POST")
+	router.Handle("/todos/{id}", mw.HandlerFunc(srv.UpdateTodo)).Methods("PUT")
+
+	router.Handle(
+		"/todos/{id}",
+		mw.Check(
+			std.WithObjectType("todo"),
+			std.WithRelation("delete"),
+			std.WithObjectIDFromVar("id"),
+		).HandlerFunc(srv.DeleteTodo)).Methods("DELETE")
 
 	srv.Start(router)
 }
@@ -176,7 +185,7 @@ func newConnection(ctx context.Context, cfg *client.Config) (grpc.ClientConnInte
 }
 
 func AsertoAuthorizer(authClient authz.AuthorizerClient, policy *middleware.Policy, policyRoot string) *std.Middleware {
-	mw := std.New(authClient, *policy).WithPolicyFromURL(policyRoot)
+	mw := std.New(authClient, policy).WithPolicyFromURL(policyRoot)
 	mw.Identity.JWT().FromHeader("Authorization")
 	return mw
 }

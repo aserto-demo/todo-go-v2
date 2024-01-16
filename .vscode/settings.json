@@ -10,6 +10,7 @@
         "lestrrat",
         "nolint",
         "protobuf",
+        "rebac",
         "todo",
         "todos"
     ]

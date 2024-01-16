@@ -70,26 +70,36 @@ func main() {
 	}
 
 	// Create authorization middleware
-	authorizationMiddleware := AsertoAuthorizer(authorizerClient,
+	mw := AsertoAuthorizer(authorizerClient,
 		&middleware.Policy{
 			Name:          options.policyInstanceName,
 			Decision:      "allowed",
 			InstanceLabel: options.policyInstanceLabel,
+			Root:          options.policyRoot,
 		},
 		options.policyRoot,
 	).WithResourceMapper(srv.TodoOwnerResourceMapper)
 
 	router := mux.NewRouter()
 
-	// Add JWT validation and authorization middleware
-	router.Use(JWTValidator(options.jwksKeysURL), authorizationMiddleware.Handler)
+	// Add JWT validation
+	router.Use(JWTValidator(options.jwksKeysURL))
 
 	// Set up routes
-	router.HandleFunc("/todos", srv.GetTodos).Methods("GET")
-	router.HandleFunc("/todos", srv.InsertTodo).Methods("POST")
-	router.HandleFunc("/todos/{id}", srv.UpdateTodo).Methods("PUT")
-	router.HandleFunc("/todos/{id}", srv.DeleteTodo).Methods("DELETE")
-	router.HandleFunc("/users/{userID}", dir.GetUser).Methods("GET")
+	router.Handle("/users/{userID}", mw.HandlerFunc(dir.GetUser)).Methods("GET")
+
+	router.Handle("/todos", mw.HandlerFunc(srv.GetTodos)).Methods("GET")
+	router.Handle("/todos/{id}", mw.HandlerFunc(srv.UpdateTodo)).Methods("PUT")
+	router.Handle("/todos/{id}", mw.HandlerFunc(srv.DeleteTodo)).Methods("DELETE")
+
+	router.Handle(
+		"/todos",
+		mw.Check(
+			std.WithObjectType("resource-creator"),
+			std.WithRelation("member"),
+			std.WithObjectID("resource-creators"),
+			std.WithPolicyPath("rebac.check"),
+		).HandlerFunc(srv.InsertTodo)).Methods("POST")
 
 	srv.Start(router)
 }
@@ -172,11 +182,11 @@ func newConnection(ctx context.Context, cfg *client.Config) (grpc.ClientConnInte
 		return nil, err
 	}
 
-	return conn.Conn, nil
+	return conn, nil
 }
 
 func AsertoAuthorizer(authClient authz.AuthorizerClient, policy *middleware.Policy, policyRoot string) *std.Middleware {
-	mw := std.New(authClient, *policy).WithPolicyFromURL(policyRoot)
+	mw := std.New(authClient, policy).WithPolicyFromURL(policyRoot)
 	mw.Identity.JWT().FromHeader("Authorization")
 	return mw
 }

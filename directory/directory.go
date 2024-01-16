@@ -116,7 +116,7 @@ func (d *Directory) AddTodo(ctx context.Context, id, owner string) error {
 		Relation: &dsc.Relation{
 			Subject:  &dsc.ObjectIdentifier{Type: proto.String("user"), Key: &owner},
 			Relation: "owner",
-			Object:   &dsc.ObjectIdentifier{Type: proto.String("todo"), Key: &id},
+			Object:   &dsc.ObjectIdentifier{Type: proto.String("resource"), Key: &id},
 		},
 	}); err != nil {
 		log.Printf("Failed to set owner relation [%+v]: %s", id, err)
@@ -128,7 +128,7 @@ func (d *Directory) AddTodo(ctx context.Context, id, owner string) error {
 
 func (d *Directory) DeleteTodo(ctx context.Context, id string) error {
 	if _, err := d.Writer.DeleteObject(ctx, &dsw.DeleteObjectRequest{
-		Param:         &dsc.ObjectIdentifier{Type: proto.String("todo"), Key: &id},
+		Param:         &dsc.ObjectIdentifier{Type: proto.String("resource"), Key: &id},
 		WithRelations: proto.Bool(true),
 	}); err != nil {
 		log.Printf("Failed to delete todo object [%+v]: %s", id, err)

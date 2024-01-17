@@ -118,9 +118,8 @@ func (s *Server) TodoOwnerResourceMapper(r *http.Request, resource map[string]in
 		return
 	}
 
-	if todo, err := s.Store.GetTodo(id); err == nil && todo != nil {
-		resource["ownerID"] = todo.OwnerID
-	}
+	resource["object_id"] = id
+
 }
 
 func cors(h http.Handler) http.Handler {

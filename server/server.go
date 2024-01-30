@@ -66,7 +66,7 @@ func (s *Server) InsertTodo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.Directory.AddTodo(r.Context(), todo.ID, todo.OwnerID); err != nil {
+	if err := s.Directory.AddTodo(r.Context(), &todo); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

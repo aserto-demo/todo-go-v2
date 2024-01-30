@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"todo-go/common"
 
+	"todo-go/store"
+
 	dsc "github.com/aserto-dev/go-directory/aserto/directory/common/v2"
 	dsr "github.com/aserto-dev/go-directory/aserto/directory/reader/v2"
 	dsw "github.com/aserto-dev/go-directory/aserto/directory/writer/v2"
@@ -26,6 +28,8 @@ var (
 
 	ErrNotFound = fmt.Errorf("not found")
 )
+
+type Todo = store.Todo
 
 type DirectoryError struct {
 	Err        error
@@ -111,15 +115,25 @@ func (d *Directory) UserFromIdentity(ctx context.Context, identity string) (*dsc
 	return objResp.Result, nil
 }
 
-func (d *Directory) AddTodo(ctx context.Context, id, owner string) error {
-	if _, err := d.Writer.SetRelation(ctx, &dsw.SetRelationRequest{
-		Relation: &dsc.Relation{
-			Subject:  &dsc.ObjectIdentifier{Type: proto.String("user"), Key: &owner},
-			Relation: "owner",
-			Object:   &dsc.ObjectIdentifier{Type: proto.String("resource"), Key: &id},
+func (d *Directory) AddTodo(ctx context.Context, todo *Todo) error {
+	if _, err := d.Writer.SetObject(ctx, &dsw.SetObjectRequest{
+		Object: &dsc.Object{
+			Key:         todo.ID,
+			Type:        "resource",
+			DisplayName: todo.Title,
 		},
 	}); err != nil {
-		log.Printf("Failed to set owner relation [%+v]: %s", id, err)
+		log.Printf("Failed to create resource [%+v]: %s", todo.Title, err)
+		return err
+	}
+	if _, err := d.Writer.SetRelation(ctx, &dsw.SetRelationRequest{
+		Relation: &dsc.Relation{
+			Subject:  &dsc.ObjectIdentifier{Type: proto.String("user"), Key: &todo.OwnerID},
+			Relation: "owner",
+			Object:   &dsc.ObjectIdentifier{Type: proto.String("resource"), Key: &todo.ID},
+		},
+	}); err != nil {
+		log.Printf("Failed to set owner relation [%+v]: %s", todo.Title, err)
 		return err
 	}
 

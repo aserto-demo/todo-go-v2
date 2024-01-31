@@ -66,6 +66,11 @@ func (s *Server) InsertTodo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := s.Directory.AddTodo(r.Context(), &todo); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	if err := json.NewEncoder(w).Encode(todo); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -93,7 +98,13 @@ func (s *Server) UpdateTodo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) DeleteTodo(w http.ResponseWriter, r *http.Request) {
-	if err := s.Store.DeleteTodo(mux.Vars(r)["id"]); err != nil {
+	id := mux.Vars(r)["id"]
+	if err := s.Directory.DeleteTodo(r.Context(), id); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := s.Store.DeleteTodo(id); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -107,9 +118,8 @@ func (s *Server) TodoOwnerResourceMapper(r *http.Request, resource map[string]in
 		return
 	}
 
-	if todo, err := s.Store.GetTodo(id); err == nil && todo != nil {
-		resource["ownerID"] = todo.OwnerID
-	}
+	resource["object_id"] = id
+
 }
 
 func cors(h http.Handler) http.Handler {

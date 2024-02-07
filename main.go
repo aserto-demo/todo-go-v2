@@ -80,6 +80,9 @@ func main() {
 		options.policyRoot,
 	).WithResourceMapper(srv.TodoOwnerResourceMapper)
 
+	// Use the sub extracted from the JWT in the authorization header
+	mw.Identity.Subject().FromHeader("Authorization")
+
 	router := mux.NewRouter()
 
 	// Add JWT validation

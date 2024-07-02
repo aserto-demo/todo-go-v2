@@ -26,9 +26,10 @@ ASERTO_POLICY_ROOT="todoApp"
 # To target an Aserto hosted authorizer, comment out the lines below and uncomment the section
 # at the bottom of this file.
 ASERTO_AUTHORIZER_SERVICE_URL=localhost:8282
-ASERTO_AUTHORIZER_CERT_PATH='$HOME/.config/topaz/certs/grpc-ca.crt'
 ASERTO_DIRECTORY_SERVICE_URL=localhost:9292
-ASERTO_DIRECTORY_GRPC_CERT_PATH='$HOME/.config/topaz/certs/grpc-ca.crt'
+## On Windows, change these to $HOMEPATH\AppData\Local\topaz\certs\grpc-ca.crt
+ASERTO_AUTHORIZER_CERT_PATH=${HOME}/.local/share/topaz/certs/grpc-ca.crt
+ASERTO_DIRECTORY_CERT_PATH=${HOME}/.local/share/topaz/certs/grpc-ca.crt
 
 # Aserto hosted authorizer
 #

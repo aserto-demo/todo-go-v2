@@ -137,13 +137,13 @@ func loadOptions() *options {
 		authorizer: client.Config{
 			Address:    authorizerAddr,
 			APIKey:     os.Getenv("ASERTO_AUTHORIZER_API_KEY"),
-			CACertPath: os.ExpandEnv(getEnv("ASERTO_AUTHORIZER_GRPC_CERT_PATH", "ASERTO_GRPC_CERT_PATH")),
+			CACertPath: os.ExpandEnv(getEnv("ASERTO_AUTHORIZER_GRPC_CA_CERT_PATH", "ASERTO_GRPC_CA_CERT_PATH")),
 			TenantID:   os.Getenv("ASERTO_TENANT_ID"),
 		},
 		directory: client.Config{
 			Address:    directoryAddr,
 			APIKey:     os.Getenv("ASERTO_DIRECTORY_API_KEY"),
-			CACertPath: os.ExpandEnv(getEnv("ASERTO_DIRECTORY_GRPC_CERT_PATH", "ASERTO_GRPC_CERT_PATH")),
+			CACertPath: os.ExpandEnv(getEnv("ASERTO_DIRECTORY_GRPC_CA_CERT_PATH", "ASERTO_GRPC_CA_CERT_PATH")),
 			TenantID:   os.Getenv("ASERTO_TENANT_ID"),
 		},
 		jwksKeysURL:         os.Getenv("JWKS_URI"),

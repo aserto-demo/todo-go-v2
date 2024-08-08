@@ -40,7 +40,6 @@ ASERTO_GRPC_CA_CERT_PATH='${HOME}/.local/share/topaz/certs/grpc-ca.crt'
 # ASERTO_AUTHORIZER_API_KEY={Your Authorizer API Key}
 # ASERTO_DIRECTORY_API_KEY={Your Directory (read-only) API Key}
 # ASERTO_POLICY_INSTANCE_NAME=todo
-# ASERTO_POLICY_INSTANCE_LABEL=todo
 ```
 
 ## Install dependencies

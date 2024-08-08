@@ -60,10 +60,9 @@ func main() {
 	// Create authorization middleware
 	mw := NewAuthorizationMiddleware(authorizerClient,
 		&middleware.Policy{
-			Name:          options.policyInstanceName,
-			Decision:      "allowed",
-			InstanceLabel: options.policyInstanceLabel,
-			Root:          options.policyRoot,
+			Name:     options.policyInstanceName,
+			Decision: "allowed",
+			Root:     options.policyRoot,
 		},
 		options.policyRoot,
 	).WithResourceMapper(srv.TodoOwnerResourceMapper)
@@ -91,9 +90,8 @@ type options struct {
 	authorizer *aserto.Config
 	directory  *ds.Config
 
-	policyInstanceName  string
-	policyInstanceLabel string
-	policyRoot          string
+	policyInstanceName string
+	policyRoot         string
 
 	jwksKeysURL string
 }
@@ -136,10 +134,9 @@ func loadOptions() *options {
 				CACertPath: os.ExpandEnv(getEnv("ASERTO_DIRECTORY_GRPC_CA_CERT_PATH", "ASERTO_GRPC_CA_CERT_PATH")),
 				TenantID:   os.Getenv("ASERTO_TENANT_ID"),
 			}},
-		jwksKeysURL:         os.Getenv("JWKS_URI"),
-		policyInstanceName:  os.Getenv("ASERTO_POLICY_INSTANCE_NAME"),
-		policyInstanceLabel: os.Getenv("ASERTO_POLICY_INSTANCE_LABEL"),
-		policyRoot:          os.Getenv("ASERTO_POLICY_ROOT"),
+		jwksKeysURL:        os.Getenv("JWKS_URI"),
+		policyInstanceName: os.Getenv("ASERTO_POLICY_INSTANCE_NAME"),
+		policyRoot:         os.Getenv("ASERTO_POLICY_ROOT"),
 	}
 }
 

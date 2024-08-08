@@ -13,6 +13,7 @@ import (
 	"todo-go/store"
 
 	"github.com/aserto-dev/go-aserto"
+	"github.com/aserto-dev/go-aserto/az"
 	"github.com/aserto-dev/go-aserto/ds/v3"
 	"github.com/aserto-dev/go-aserto/middleware"
 	"github.com/aserto-dev/go-aserto/middleware/gorillaz"
@@ -23,7 +24,6 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
-	"google.golang.org/grpc"
 )
 
 func main() {
@@ -41,15 +41,17 @@ func main() {
 	if err != nil {
 		log.Fatalln("Failed to create directory connection:", err)
 	}
+	defer dir.Close()
 
 	// Initialize the Server
 	srv := server.Server{Store: db, Directory: dir}
 
 	// Create an authorizer client
-	authorizerClient, err := NewAuthorizerClient(options.authorizer)
+	azClient, err := NewAuthorizerClient(options.authorizer)
 	if err != nil {
 		log.Fatalln("Retry: Failed to create authorizer client:", err)
 	}
+	defer azClient.Close()
 
 	router := mux.NewRouter()
 
@@ -58,7 +60,7 @@ func main() {
 	router.Use(JWTValidator(options.jwksKeysURL))
 
 	// Create authorization middleware
-	mw := NewAuthorizationMiddleware(authorizerClient,
+	mw := NewAuthorizationMiddleware(azClient.Authorizer,
 		&middleware.Policy{
 			Name:     options.policyInstanceName,
 			Decision: "allowed",
@@ -140,27 +142,13 @@ func loadOptions() *options {
 	}
 }
 
-func NewAuthorizerClient(cfg *aserto.Config) (authorizer.AuthorizerClient, error) {
-	conn, err := newConnection(cfg)
+func NewAuthorizerClient(cfg *aserto.Config) (*az.Client, error) {
+	opts, err := cfg.ToConnectionOptions(aserto.NewDialOptionsProvider())
 	if err != nil {
 		return nil, err
 	}
 
-	return authorizer.NewAuthorizerClient(conn), nil
-}
-
-func newConnection(cfg *aserto.Config) (grpc.ClientConnInterface, error) {
-	connectionOpts, err := cfg.ToConnectionOptions(aserto.NewDialOptionsProvider())
-	if err != nil {
-		return nil, err
-	}
-
-	conn, err := aserto.NewConnection(connectionOpts...)
-	if err != nil {
-		return nil, err
-	}
-
-	return conn, nil
+	return az.New(opts...)
 }
 
 func NewAuthorizationMiddleware(authClient authorizer.AuthorizerClient, policy *middleware.Policy, policyRoot string) *gorillaz.Middleware {

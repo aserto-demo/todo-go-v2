@@ -55,6 +55,10 @@ func NewDirectory(cfg *ds.Config) (*Directory, error) {
 	return &Directory{client: client}, nil
 }
 
+func (d *Directory) Close() error {
+	return d.client.Close()
+}
+
 func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
 	userID := mux.Vars(r)["userID"]
 	callerPID, ok := r.Context().Value(common.ContextKeySubject).(string)

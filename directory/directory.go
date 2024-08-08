@@ -11,6 +11,7 @@ import (
 	"todo-go/store"
 
 	cerr "github.com/aserto-dev/errors"
+	"github.com/aserto-dev/go-aserto/ds/v3"
 	dsc "github.com/aserto-dev/go-directory/aserto/directory/common/v3"
 	dsr "github.com/aserto-dev/go-directory/aserto/directory/reader/v3"
 	dsw "github.com/aserto-dev/go-directory/aserto/directory/writer/v3"
@@ -18,7 +19,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/mux"
-	"google.golang.org/grpc"
 )
 
 var (
@@ -43,15 +43,16 @@ func (e *DirectoryError) Error() string {
 }
 
 type Directory struct {
-	Reader dsr.ReaderClient
-	Writer dsw.WriterClient
+	client *ds.Client
 }
 
-func NewDirectory(conn grpc.ClientConnInterface) *Directory {
-	return &Directory{
-		Reader: dsr.NewReaderClient(conn),
-		Writer: dsw.NewWriterClient(conn),
+func NewDirectory(cfg *ds.Config) (*Directory, error) {
+	client, err := cfg.Connect()
+	if err != nil {
+		return nil, err
 	}
+
+	return &Directory{client: client}, nil
 }
 
 func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
@@ -91,7 +92,7 @@ func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Directory) UserFromIdentity(ctx context.Context, identity string) (*dsc.Object, error) {
-	relResp, err := d.Reader.GetRelation(ctx, &dsr.GetRelationRequest{
+	relResp, err := d.client.Reader.GetRelation(ctx, &dsr.GetRelationRequest{
 		SubjectType: "user",
 		Relation:    "identifier",
 		ObjectType:  "identity",
@@ -116,7 +117,7 @@ func (d *Directory) UserFromIdentity(ctx context.Context, identity string) (*dsc
 }
 
 func (d *Directory) AddTodo(ctx context.Context, todo *Todo) error {
-	if _, err := d.Writer.SetObject(ctx, &dsw.SetObjectRequest{
+	if _, err := d.client.Writer.SetObject(ctx, &dsw.SetObjectRequest{
 		Object: &dsc.Object{
 			Id:          todo.ID,
 			Type:        "resource",
@@ -126,7 +127,7 @@ func (d *Directory) AddTodo(ctx context.Context, todo *Todo) error {
 		log.Printf("Failed to create resource [%+v]: %s", todo.Title, err)
 		return err
 	}
-	if _, err := d.Writer.SetRelation(ctx, &dsw.SetRelationRequest{
+	if _, err := d.client.Writer.SetRelation(ctx, &dsw.SetRelationRequest{
 		Relation: &dsc.Relation{
 			SubjectType: "user",
 			SubjectId:   todo.OwnerID,
@@ -143,7 +144,7 @@ func (d *Directory) AddTodo(ctx context.Context, todo *Todo) error {
 }
 
 func (d *Directory) DeleteTodo(ctx context.Context, id string) error {
-	if _, err := d.Writer.DeleteObject(ctx, &dsw.DeleteObjectRequest{
+	if _, err := d.client.Writer.DeleteObject(ctx, &dsw.DeleteObjectRequest{
 		ObjectType:    "resource",
 		ObjectId:      id,
 		WithRelations: true,
@@ -156,7 +157,7 @@ func (d *Directory) DeleteTodo(ctx context.Context, id string) error {
 }
 
 func (d *Directory) getObject(ctx context.Context, objType, objID string) (*dsc.Object, error) {
-	resp, err := d.Reader.GetObject(ctx, &dsr.GetObjectRequest{ObjectType: objType, ObjectId: objID})
+	resp, err := d.client.Reader.GetObject(ctx, &dsr.GetObjectRequest{ObjectType: objType, ObjectId: objID})
 	if err != nil {
 		log.Printf("Failed to get object[%s:%s]: %s", objType, objID, err)
 		return nil, err

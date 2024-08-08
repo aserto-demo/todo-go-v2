@@ -8,7 +8,7 @@ go 1.21
 
 require (
 	github.com/aserto-dev/errors v0.0.9
-	github.com/aserto-dev/go-aserto v0.31.6-0.20240808220507-4a54b01c6f0d
+	github.com/aserto-dev/go-aserto v0.31.6-0.20240808230126-d4cf89f6c1b5
 	github.com/aserto-dev/go-aserto/middleware/gorillaz v0.0.0-20240808220507-4a54b01c6f0d
 	github.com/aserto-dev/go-authorizer v0.20.8
 	github.com/aserto-dev/go-directory v0.31.9

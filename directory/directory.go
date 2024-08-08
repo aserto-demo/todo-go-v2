@@ -3,7 +3,6 @@ package directory
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,13 +10,15 @@ import (
 
 	"todo-go/store"
 
-	dsc "github.com/aserto-dev/go-directory/aserto/directory/common/v2"
-	dsr "github.com/aserto-dev/go-directory/aserto/directory/reader/v2"
-	dsw "github.com/aserto-dev/go-directory/aserto/directory/writer/v2"
+	cerr "github.com/aserto-dev/errors"
+	dsc "github.com/aserto-dev/go-directory/aserto/directory/common/v3"
+	dsr "github.com/aserto-dev/go-directory/aserto/directory/reader/v3"
+	dsw "github.com/aserto-dev/go-directory/aserto/directory/writer/v3"
+	"github.com/aserto-dev/go-directory/pkg/derr"
+	"github.com/pkg/errors"
 
 	"github.com/gorilla/mux"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -54,7 +55,7 @@ func NewDirectory(conn grpc.ClientConnInterface) *Directory {
 }
 
 func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
-	userKey := mux.Vars(r)["userID"]
+	userID := mux.Vars(r)["userID"]
 	callerPID, ok := r.Context().Value(common.ContextKeySubject).(string)
 	if !ok {
 		http.Error(w, "context does not contain a subject value", http.StatusExpectationFailed)
@@ -63,10 +64,10 @@ func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
 
 	var userObj *dsc.Object
 	var err error
-	if userKey == callerPID {
-		userObj, err = d.UserFromIdentity(r.Context(), userKey)
+	if userID == callerPID {
+		userObj, err = d.UserFromIdentity(r.Context(), userID)
 	} else {
-		userObj, err = d.getObject(r.Context(), &dsc.ObjectIdentifier{Type: proto.String("user"), Key: &userKey})
+		userObj, err = d.getObject(r.Context(), "user", userID)
 	}
 	if err != nil {
 		var dirErr *DirectoryError
@@ -91,34 +92,33 @@ func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
 
 func (d *Directory) UserFromIdentity(ctx context.Context, identity string) (*dsc.Object, error) {
 	relResp, err := d.Reader.GetRelation(ctx, &dsr.GetRelationRequest{
-		Param: &dsc.RelationIdentifier{
-			Subject:  &dsc.ObjectIdentifier{Type: proto.String("user")},
-			Relation: &dsc.RelationTypeIdentifier{Name: proto.String("identifier"), ObjectType: proto.String("identity")},
-			Object:   &dsc.ObjectIdentifier{Type: proto.String("identity"), Key: &identity},
-		},
+		SubjectType: "user",
+		Relation:    "identifier",
+		ObjectType:  "identity",
+		ObjectId:    identity,
+		WithObjects: true,
 	})
 	switch {
+	case errors.Is(cerr.UnwrapAsertoError(err), derr.ErrRelationNotFound):
+		log.Printf("identity not found [%s]", identity)
+		return nil, ErrNotFound
 	case err != nil:
 		log.Printf("Failed to get relations for identity [%+v]: %s", identity, err)
 		return nil, err
-	case len(relResp.Results) == 0:
-		log.Printf("No relations found for identity [%+v]", identity)
-		return nil, ErrNotFound
 	}
 
-	objResp, err := d.Reader.GetObject(ctx, &dsr.GetObjectRequest{Param: relResp.Results[0].Subject})
-	if err != nil {
-		log.Printf("Failed to get user object [%+v]: %s", relResp.Results[0].Subject, err)
-		return nil, err
+	user, ok := relResp.Objects[fmt.Sprintf("%s:%s", "user", relResp.Result.SubjectId)]
+	if !ok {
+		return nil, errors.Wrap(ErrNotFound, "user not found")
 	}
 
-	return objResp.Result, nil
+	return user, nil
 }
 
 func (d *Directory) AddTodo(ctx context.Context, todo *Todo) error {
 	if _, err := d.Writer.SetObject(ctx, &dsw.SetObjectRequest{
 		Object: &dsc.Object{
-			Key:         todo.ID,
+			Id:          todo.ID,
 			Type:        "resource",
 			DisplayName: todo.Title,
 		},
@@ -128,9 +128,11 @@ func (d *Directory) AddTodo(ctx context.Context, todo *Todo) error {
 	}
 	if _, err := d.Writer.SetRelation(ctx, &dsw.SetRelationRequest{
 		Relation: &dsc.Relation{
-			Subject:  &dsc.ObjectIdentifier{Type: proto.String("user"), Key: &todo.OwnerID},
-			Relation: "owner",
-			Object:   &dsc.ObjectIdentifier{Type: proto.String("resource"), Key: &todo.ID},
+			SubjectType: "user",
+			SubjectId:   todo.OwnerID,
+			Relation:    "owner",
+			ObjectType:  "resource",
+			ObjectId:    todo.ID,
 		},
 	}); err != nil {
 		log.Printf("Failed to set owner relation [%+v]: %s", todo.Title, err)
@@ -142,8 +144,9 @@ func (d *Directory) AddTodo(ctx context.Context, todo *Todo) error {
 
 func (d *Directory) DeleteTodo(ctx context.Context, id string) error {
 	if _, err := d.Writer.DeleteObject(ctx, &dsw.DeleteObjectRequest{
-		Param:         &dsc.ObjectIdentifier{Type: proto.String("resource"), Key: &id},
-		WithRelations: proto.Bool(true),
+		ObjectType:    "resource",
+		ObjectId:      id,
+		WithRelations: true,
 	}); err != nil {
 		log.Printf("Failed to delete todo object [%+v]: %s", id, err)
 		return err
@@ -152,34 +155,19 @@ func (d *Directory) DeleteTodo(ctx context.Context, id string) error {
 	return nil
 }
 
-func (d *Directory) getObject(ctx context.Context, identifier *dsc.ObjectIdentifier) (*dsc.Object, error) {
-	resp, err := d.Reader.GetObject(ctx, &dsr.GetObjectRequest{Param: identifier})
+func (d *Directory) getObject(ctx context.Context, objType, objID string) (*dsc.Object, error) {
+	resp, err := d.Reader.GetObject(ctx, &dsr.GetObjectRequest{ObjectType: objType, ObjectId: objID})
 	if err != nil {
-		log.Printf("Failed to get object[%+v]: %s", identifier, err)
+		log.Printf("Failed to get object[%s:%s]: %s", objType, objID, err)
 		return nil, err
 	}
 
 	return resp.Result, nil
 }
 
-// nolint: unused
-func (d *Directory) getRelation(ctx context.Context, identifier *dsc.RelationIdentifier) (*dsc.Relation, error) {
-	relationResp, err := d.Reader.GetRelations(ctx, &dsr.GetRelationsRequest{Param: identifier})
-	switch {
-	case err != nil:
-		log.Printf("Failed to get relations for [%+v]: %s", identifier, err)
-		return nil, err
-	case len(relationResp.Results) == 0:
-		log.Printf("No relations found for [%+v]", identifier)
-		return nil, ErrNotFound
-	}
-
-	return relationResp.Results[0], nil
-}
-
 func userAsMap(user *dsc.Object) map[string]interface{} {
 	userMap := user.Properties.AsMap()
-	userMap["key"] = user.Key
+	userMap["key"] = user.Id
 	userMap["name"] = user.DisplayName
 	return userMap
 }

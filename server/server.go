@@ -59,7 +59,7 @@ func (s *Server) InsertTodo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	todo.ID = uuid.New().String()
-	todo.OwnerID = owner.Key
+	todo.OwnerID = owner.Id
 
 	if err := s.Store.InsertTodo(&todo); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

@@ -16,7 +16,7 @@ import (
 	"github.com/aserto-dev/go-aserto/middleware"
 	"github.com/aserto-dev/go-aserto/middleware/http/std"
 	authz "github.com/aserto-dev/go-authorizer/aserto/authorizer/v2"
-	dsr "github.com/aserto-dev/go-directory/aserto/directory/reader/v2"
+	dsr "github.com/aserto-dev/go-directory/aserto/directory/reader/v3"
 
 	"github.com/avast/retry-go"
 	"github.com/gorilla/mux"
@@ -137,13 +137,13 @@ func loadOptions() *options {
 		authorizer: client.Config{
 			Address:    authorizerAddr,
 			APIKey:     os.Getenv("ASERTO_AUTHORIZER_API_KEY"),
-			CACertPath: os.ExpandEnv(os.Getenv("ASERTO_AUTHORIZER_CERT_PATH")),
+			CACertPath: os.ExpandEnv(getEnv("ASERTO_AUTHORIZER_GRPC_CA_CERT_PATH", "ASERTO_GRPC_CA_CERT_PATH")),
 			TenantID:   os.Getenv("ASERTO_TENANT_ID"),
 		},
 		directory: client.Config{
 			Address:    directoryAddr,
 			APIKey:     os.Getenv("ASERTO_DIRECTORY_API_KEY"),
-			CACertPath: os.ExpandEnv(os.Getenv("ASERTO_DIRECTORY_GRPC_CERT_PATH")),
+			CACertPath: os.ExpandEnv(getEnv("ASERTO_DIRECTORY_GRPC_CA_CERT_PATH", "ASERTO_GRPC_CA_CERT_PATH")),
 			TenantID:   os.Getenv("ASERTO_TENANT_ID"),
 		},
 		jwksKeysURL:         os.Getenv("JWKS_URI"),
@@ -214,4 +214,13 @@ func JWTValidator(jwksKeysURL string) func(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), common.ContextKeySubject, token.Subject())))
 		})
 	}
+}
+
+func getEnv(vars ...string) string {
+	for _, v := range vars {
+		if val := os.Getenv(v); val != "" {
+			return val
+		}
+	}
+	return ""
 }

@@ -8,9 +8,9 @@ go 1.21
 
 require (
 	github.com/aserto-dev/errors v0.0.9
-	github.com/aserto-dev/go-aserto v0.31.6-0.20240809170035-b23b89354298
-	github.com/aserto-dev/go-aserto/middleware/gorillaz v0.0.0-20240809170035-b23b89354298
-	github.com/aserto-dev/go-authorizer v0.20.8
+	github.com/aserto-dev/go-aserto v0.32.0
+	github.com/aserto-dev/go-aserto/middleware/gorillaz v0.0.0-20240809184801-5b113a17afcd
+	github.com/aserto-dev/go-authorizer v0.20.10
 	github.com/aserto-dev/go-directory v0.31.9
 	github.com/blockloop/scan v1.3.0
 	github.com/google/uuid v1.6.0

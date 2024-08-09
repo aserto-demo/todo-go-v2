@@ -60,7 +60,7 @@ func main() {
 	router.Use(JWTValidator(options.jwksKeysURL))
 
 	// Create authorization middleware
-	mw := NewAuthorizationMiddleware(azClient.Authorizer,
+	mw := NewAuthorizationMiddleware(azClient,
 		&middleware.Policy{
 			Name:     options.policyInstanceName,
 			Decision: "allowed",

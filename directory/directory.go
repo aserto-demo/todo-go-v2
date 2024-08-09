@@ -11,6 +11,7 @@ import (
 	"todo-go/store"
 
 	cerr "github.com/aserto-dev/errors"
+	"github.com/aserto-dev/go-aserto/ds/v3"
 	dsc "github.com/aserto-dev/go-directory/aserto/directory/common/v3"
 	dsr "github.com/aserto-dev/go-directory/aserto/directory/reader/v3"
 	dsw "github.com/aserto-dev/go-directory/aserto/directory/writer/v3"
@@ -18,7 +19,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gorilla/mux"
-	"google.golang.org/grpc"
 )
 
 var (
@@ -43,15 +43,16 @@ func (e *DirectoryError) Error() string {
 }
 
 type Directory struct {
-	Reader dsr.ReaderClient
-	Writer dsw.WriterClient
+	*ds.Client
 }
 
-func NewDirectory(conn grpc.ClientConnInterface) *Directory {
-	return &Directory{
-		Reader: dsr.NewReaderClient(conn),
-		Writer: dsw.NewWriterClient(conn),
+func NewDirectory(cfg *ds.Config) (*Directory, error) {
+	client, err := cfg.Connect()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create directory client")
 	}
+
+	return &Directory{Client: client}, nil
 }
 
 func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {

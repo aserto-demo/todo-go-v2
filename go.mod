@@ -5,7 +5,6 @@ go 1.21
 require (
 	github.com/aserto-dev/errors v0.0.9
 	github.com/aserto-dev/go-aserto v0.32.0
-	github.com/aserto-dev/go-aserto/middleware/gorillaz v0.0.0-20240809184801-5b113a17afcd
 	github.com/aserto-dev/go-directory v0.31.9
 	github.com/blockloop/scan v1.3.0
 	github.com/google/uuid v1.6.0
@@ -19,7 +18,6 @@ require (
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.34.2-20240717164558-a6c49f84cc0f.2 // indirect
-	github.com/aserto-dev/go-authorizer v0.20.10 // indirect
 	github.com/aserto-dev/header v0.0.7 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
 	github.com/go-http-utils/headers v0.0.0-20181008091004-fed159eddc2a // indirect

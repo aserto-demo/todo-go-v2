@@ -4,10 +4,6 @@ github.com/aserto-dev/errors v0.0.9 h1:Pi6UT/v+0DYc25AKVFgazkz7Sua3zyU3KWl5VsoRP
 github.com/aserto-dev/errors v0.0.9/go.mod h1:mk3xXE6e9cA5NFk2B3KdNuUcSR+dVGbIlvbaT5ZTOtQ=
 github.com/aserto-dev/go-aserto v0.32.0 h1:Ou5V4wtNIB16lGxRX9a6sOI2wbnJ/b0UVL8tf4G+y94=
 github.com/aserto-dev/go-aserto v0.32.0/go.mod h1:62sSMN5NvzoRJL9HjmR5x4mhVPs/7CX3/3Q/MuJQGIA=
-github.com/aserto-dev/go-aserto/middleware/gorillaz v0.0.0-20240809184801-5b113a17afcd h1:GePwLmQCz0piw05C3Os1Io3h+c4NytxZHXHqrgVeT+Y=
-github.com/aserto-dev/go-aserto/middleware/gorillaz v0.0.0-20240809184801-5b113a17afcd/go.mod h1:sy5hHfngQlgs1WI1QF2njnXYiflYGYieAxkFSI7XimU=
-github.com/aserto-dev/go-authorizer v0.20.10 h1:H3IrMG7iti9bF0yWsiIQB7ApC9AaS6Zn7HIcLZlp4Jw=
-github.com/aserto-dev/go-authorizer v0.20.10/go.mod h1:lncQZDlVYhXMsVBYnPvrFhGjtuvmNBJfUkIamy1dtrM=
 github.com/aserto-dev/go-directory v0.31.9 h1:XyZ9Ug9j0uGE+pDEka4DjuXv1eJEAnWCOlZHvt5kzx8=
 github.com/aserto-dev/go-directory v0.31.9/go.mod h1:T125gQBcPXrLUh7bMPFHzsXRHUnZb++DzhPk8o8tc4k=
 github.com/aserto-dev/header v0.0.7 h1:hlo5/zYsBOsxzPxtve7LRbXyBbQmKSPAyOfmPhGgirM=

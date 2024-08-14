@@ -2,13 +2,13 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"todo-go/server"
 
-	"github.com/aserto-dev/go-aserto/middleware/gorillaz"
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog/log"
 )
@@ -34,18 +34,8 @@ func main() {
 	// This middleware validates incoming JWTs and stores the subject name in the request context.
 	authn := AuthenticationMiddleware(ctx, options)
 
-	// Create an authorizer client
-	azClient, err := NewAuthorizerClient(options.Authorizer)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create authorizer client")
-	}
-	defer azClient.Close()
-
-	// This middleware authorizes incoming requests.
-	authz := AuthorizationMiddleware(azClient, options)
-
 	// Create the API router.
-	router := AppRouter(srv, authn, authz)
+	router := AppRouter(srv, authn)
 
 	// Start the server
 	go func() {
@@ -59,27 +49,19 @@ func main() {
 	srv.Shutdown(5 * time.Second)
 }
 
-func AppRouter(srv *server.Server, authn mux.MiddlewareFunc, authz *gorillaz.Middleware) *mux.Router {
+func AppRouter(srv *server.Server, authn mux.MiddlewareFunc) *mux.Router {
 	router := mux.NewRouter()
 
 	// Add authentication middleware to all routes.
 	router.Use(authn)
 
 	// Set up routes
-	router.Handle("/users/{userID}", authz.HandlerFunc(srv.GetUser)).Methods("GET")
+	router.Handle("/users/{userID}", http.HandlerFunc(srv.GetUser)).Methods("GET")
 
-	router.Handle("/todos", authz.HandlerFunc(srv.GetTodos)).Methods("GET")
-	router.Handle("/todos/{id}", authz.HandlerFunc(srv.UpdateTodo)).Methods("PUT")
-	router.Handle("/todos/{id}", authz.HandlerFunc(srv.DeleteTodo)).Methods("DELETE")
-
-	router.Handle(
-		"/todos",
-		authz.Check(
-			gorillaz.WithObjectType("resource-creator"),
-			gorillaz.WithRelation("member"),
-			gorillaz.WithObjectID("resource-creators"),
-			gorillaz.WithPolicyPath("rebac.check"),
-		).HandlerFunc(srv.InsertTodo)).Methods("POST")
+	router.Handle("/todos", http.HandlerFunc(srv.GetTodos)).Methods("GET")
+	router.Handle("/todos/{id}", http.HandlerFunc(srv.UpdateTodo)).Methods("PUT")
+	router.Handle("/todos/{id}", http.HandlerFunc(srv.DeleteTodo)).Methods("DELETE")
+	router.Handle("/todos", http.HandlerFunc(srv.InsertTodo)).Methods("POST")
 
 	return router
 }

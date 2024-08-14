@@ -31,6 +31,10 @@ type Store struct {
 	DB *sql.DB
 }
 
+func (s *Store) Close() error {
+	return s.DB.Close()
+}
+
 func (s *Store) GetTodos() ([]Todo, error) {
 	return s.loadTodos("")
 }

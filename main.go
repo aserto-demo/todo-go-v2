@@ -3,191 +3,93 @@ package main
 import (
 	"context"
 	"log"
-	"net/http"
 	"os"
-	"strings"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"todo-go/common"
-	"todo-go/directory"
 	"todo-go/server"
-	"todo-go/store"
 
-	"github.com/aserto-dev/go-aserto"
-	"github.com/aserto-dev/go-aserto/az"
-	"github.com/aserto-dev/go-aserto/ds/v3"
-	"github.com/aserto-dev/go-aserto/middleware"
 	"github.com/aserto-dev/go-aserto/middleware/gorillaz"
-	"github.com/aserto-dev/go-authorizer/aserto/authorizer/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
-	"github.com/lestrrat-go/jwx/v2/jwk"
-	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
 func main() {
-	initLogger()
-	options := loadOptions()
+	// Initialize logging
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+	zerolog.DefaultContextLogger = &logger
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
 
-	// Initialize the Todo Store
-	db, dbError := store.NewStore()
-	if dbError != nil {
-		log.Fatal("Failed to create store:", dbError)
-	}
-
-	// Create a directory client
-	dir, err := directory.NewDirectory(options.directory)
+	options, err := server.LoadOptions()
 	if err != nil {
-		log.Fatalln("Failed to create directory connection:", err)
+		log.Fatalln("failed to load options:", err)
 	}
-	defer dir.Close()
 
 	// Initialize the Server
-	srv := server.Server{Store: db, Directory: dir}
+	srv, err := server.New(options)
+	if err != nil {
+		log.Fatalln("failed to create server:", err)
+	}
+	defer srv.Close()
 
 	// Create an authorizer client
-	azClient, err := NewAuthorizerClient(options.authorizer)
+	azClient, err := NewAuthorizerClient(options.Authorizer)
 	if err != nil {
-		log.Fatalln("Retry: Failed to create authorizer client:", err)
+		log.Fatalln("failed to create authorizer client:", err)
 	}
 	defer azClient.Close()
 
+	// Create a context that is cancelled when SIGINT or SIGTERM is received
+	ctx, stop := signalContext()
+	defer stop()
+
+	// This middleware validates incoming JWTs and stores the subject name in the request context.
+	authn := AuthenticationMiddleware(ctx, options)
+
+	// This middleware authorizes incoming requests.
+	authz := AuthorizationMiddleware(azClient, options)
+
+	router := AppRouter(srv, authn, authz)
+
+	// Start the server
+	go func() {
+		srv.Start(router)
+	}()
+
+	// Wait for the context to be cancelled
+	<-ctx.Done()
+
+	// Gracefully shutdown the server
+	srv.Shutdown(5 * time.Second)
+}
+
+func AppRouter(srv *server.Server, authn mux.MiddlewareFunc, authz *gorillaz.Middleware) *mux.Router {
 	router := mux.NewRouter()
 
-	// Add JWT validation. This middleware validates incoming JWT tokens and stores the subject name in the request
-	// context.
-	router.Use(JWTValidator(options.jwksKeysURL))
-
-	// Create authorization middleware
-	mw := NewAuthorizationMiddleware(azClient,
-		&middleware.Policy{
-			Name:     options.policyInstanceName,
-			Decision: "allowed",
-			Root:     options.policyRoot,
-		},
-		options.policyRoot,
-	).WithResourceMapper(srv.TodoOwnerResourceMapper)
+	router.Use(authn)
 
 	// Set up routes
-	router.Handle("/users/{userID}", mw.HandlerFunc(dir.GetUser)).Methods("GET")
+	router.Handle("/users/{userID}", authz.HandlerFunc(srv.GetUser)).Methods("GET")
 
-	router.Handle("/todos", mw.HandlerFunc(srv.GetTodos)).Methods("GET")
-	router.Handle("/todos/{id}", mw.HandlerFunc(srv.UpdateTodo)).Methods("PUT")
-	router.Handle("/todos/{id}", mw.HandlerFunc(srv.DeleteTodo)).Methods("DELETE")
+	router.Handle("/todos", authz.HandlerFunc(srv.GetTodos)).Methods("GET")
+	router.Handle("/todos/{id}", authz.HandlerFunc(srv.UpdateTodo)).Methods("PUT")
+	router.Handle("/todos/{id}", authz.HandlerFunc(srv.DeleteTodo)).Methods("DELETE")
 
 	router.Handle(
 		"/todos",
-		mw.Check(
+		authz.Check(
 			gorillaz.WithObjectType("resource-creator"),
 			gorillaz.WithRelation("member"),
 			gorillaz.WithObjectID("resource-creators"),
 			gorillaz.WithPolicyPath("rebac.check"),
 		).HandlerFunc(srv.InsertTodo)).Methods("POST")
 
-	srv.Start(router)
+	return router
 }
 
-type options struct {
-	authorizer *aserto.Config
-	directory  *ds.Config
-
-	policyInstanceName string
-	policyRoot         string
-
-	jwksKeysURL string
-}
-
-func initLogger() {
-	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
-	zerolog.DefaultContextLogger = &logger
-	zerolog.SetGlobalLevel(zerolog.DebugLevel)
-}
-
-func loadOptions() *options {
-	if envFileError := godotenv.Load(); envFileError != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	authorizerAddr := os.Getenv("ASERTO_AUTHORIZER_SERVICE_URL")
-	if authorizerAddr == "" {
-		authorizerAddr = "authorizer.prod.aserto.com:8443"
-	}
-
-	directoryAddr := os.Getenv("ASERTO_DIRECTORY_SERVICE_URL")
-	if directoryAddr == "" {
-		directoryAddr = "directory.prod.aserto.com:8443"
-	}
-
-	log.Printf("Authorizer: %s\n", authorizerAddr)
-	log.Printf("Directory:  %s\n", directoryAddr)
-
-	return &options{
-		authorizer: &aserto.Config{
-			Address:    authorizerAddr,
-			APIKey:     os.Getenv("ASERTO_AUTHORIZER_API_KEY"),
-			CACertPath: os.ExpandEnv(getEnv("ASERTO_AUTHORIZER_GRPC_CA_CERT_PATH", "ASERTO_GRPC_CA_CERT_PATH")),
-			TenantID:   os.Getenv("ASERTO_TENANT_ID"),
-		},
-		directory: &ds.Config{
-			Config: &aserto.Config{
-				Address:    directoryAddr,
-				APIKey:     os.Getenv("ASERTO_DIRECTORY_API_KEY"),
-				CACertPath: os.ExpandEnv(getEnv("ASERTO_DIRECTORY_GRPC_CA_CERT_PATH", "ASERTO_GRPC_CA_CERT_PATH")),
-				TenantID:   os.Getenv("ASERTO_TENANT_ID"),
-			}},
-		jwksKeysURL:        os.Getenv("JWKS_URI"),
-		policyInstanceName: os.Getenv("ASERTO_POLICY_INSTANCE_NAME"),
-		policyRoot:         os.Getenv("ASERTO_POLICY_ROOT"),
-	}
-}
-
-func NewAuthorizerClient(cfg *aserto.Config) (*az.Client, error) {
-	opts, err := cfg.ToConnectionOptions(aserto.NewDialOptionsProvider())
-	if err != nil {
-		return nil, err
-	}
-
-	return az.New(opts...)
-}
-
-func NewAuthorizationMiddleware(authClient authorizer.AuthorizerClient, policy *middleware.Policy, policyRoot string) *gorillaz.Middleware {
-	mw := gorillaz.New(authClient, policy).WithPolicyFromURL(policyRoot)
-	// Retrieve the caller's identity from the context value set by the JWTValidator middleware
-	mw.Identity.Subject().FromContextValue(common.ContextKeySubject)
-	return mw
-}
-
-func JWTValidator(jwksKeysURL string) func(next http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			keys, err := jwk.Fetch(r.Context(), jwksKeysURL)
-			if err != nil || keys == nil {
-				log.Printf("Failed to fetch JWKs from [%s]: %s", jwksKeysURL, err)
-				http.Error(w, err.Error(), http.StatusUnauthorized)
-				return
-			}
-
-			authorizationHeader := r.Header.Get("Authorization")
-			tokenBytes := []byte(strings.Replace(authorizationHeader, "Bearer ", "", 1))
-
-			jwt.WithVerifyAuto(nil)
-			token, err := jwt.Parse(tokenBytes, jwt.WithKeySet(keys))
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusUnauthorized)
-				return
-			}
-
-			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), common.ContextKeySubject, token.Subject())))
-		})
-	}
-}
-
-func getEnv(vars ...string) string {
-	for _, v := range vars {
-		if val := os.Getenv(v); val != "" {
-			return val
-		}
-	}
-	return ""
+// signalContext returns a context that is cancelled when SIGINT or SIGTERM is received.
+func signalContext() (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 }

@@ -2,11 +2,8 @@ package directory
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
-	"todo-go/common"
 
 	"todo-go/store"
 
@@ -17,8 +14,6 @@ import (
 	dsw "github.com/aserto-dev/go-directory/aserto/directory/writer/v3"
 	"github.com/aserto-dev/go-directory/pkg/derr"
 	"github.com/pkg/errors"
-
-	"github.com/gorilla/mux"
 )
 
 var (
@@ -31,16 +26,6 @@ var (
 )
 
 type Todo = store.Todo
-
-type DirectoryError struct {
-	Err        error
-	Message    string
-	StatusCode int
-}
-
-func (e *DirectoryError) Error() string {
-	return e.Message
-}
 
 type Directory struct {
 	*ds.Client
@@ -55,40 +40,14 @@ func NewDirectory(cfg *ds.Config) (*Directory, error) {
 	return &Directory{Client: client}, nil
 }
 
-func (d *Directory) GetUser(w http.ResponseWriter, r *http.Request) {
-	userID := mux.Vars(r)["userID"]
-	callerPID, ok := r.Context().Value(common.ContextKeySubject).(string)
-	if !ok {
-		http.Error(w, "context does not contain a subject value", http.StatusExpectationFailed)
-		return
-	}
-
-	var userObj *dsc.Object
-	var err error
-	if userID == callerPID {
-		userObj, err = d.UserFromIdentity(r.Context(), userID)
-	} else {
-		userObj, err = d.getObject(r.Context(), "user", userID)
-	}
+func (d *Directory) GetUser(ctx context.Context, objID string) (*dsc.Object, error) {
+	resp, err := d.Reader.GetObject(ctx, &dsr.GetObjectRequest{ObjectType: "user", ObjectId: objID})
 	if err != nil {
-		var dirErr *DirectoryError
-		if errors.As(err, &dirErr) {
-			log.Printf("%s. %s", dirErr.Message, dirErr.Err)
-			http.Error(w, dirErr.Message, dirErr.StatusCode)
-			return
-		}
-
-		log.Printf("Failed to get user: %s", err)
-		http.Error(w, "failed to get user", http.StatusInternalServerError)
-		return
+		log.Printf("Failed to get user [%s]: %s", objID, err)
+		return nil, err
 	}
 
-	w.Header().Add("Content-Type", "application/json")
-	encodeJSONError := json.NewEncoder(w).Encode(userAsMap(userObj))
-	if encodeJSONError != nil {
-		http.Error(w, encodeJSONError.Error(), http.StatusBadRequest)
-		return
-	}
+	return resp.Result, nil
 }
 
 func (d *Directory) UserFromIdentity(ctx context.Context, identity string) (*dsc.Object, error) {
@@ -154,21 +113,4 @@ func (d *Directory) DeleteTodo(ctx context.Context, id string) error {
 	}
 
 	return nil
-}
-
-func (d *Directory) getObject(ctx context.Context, objType, objID string) (*dsc.Object, error) {
-	resp, err := d.Reader.GetObject(ctx, &dsr.GetObjectRequest{ObjectType: objType, ObjectId: objID})
-	if err != nil {
-		log.Printf("Failed to get object[%s:%s]: %s", objType, objID, err)
-		return nil, err
-	}
-
-	return resp.Result, nil
-}
-
-func userAsMap(user *dsc.Object) map[string]interface{} {
-	userMap := user.Properties.AsMap()
-	userMap["key"] = user.Id
-	userMap["name"] = user.DisplayName
-	return userMap
 }

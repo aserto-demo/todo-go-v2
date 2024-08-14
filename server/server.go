@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 	"time"
 
@@ -15,7 +14,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
+
+const listenAddr = "0.0.0.0:3001"
 
 type Server struct {
 	Store     *store.Store
@@ -38,7 +40,7 @@ func New(options *Options) (*Server, error) {
 	}
 
 	srv := &http.Server{
-		Addr:              "0.0.0.0:3001",
+		Addr:              listenAddr,
 		ReadTimeout:       1 * time.Second,
 		WriteTimeout:      1 * time.Second,
 		IdleTimeout:       30 * time.Second,
@@ -49,12 +51,12 @@ func New(options *Options) (*Server, error) {
 }
 
 func (s *Server) Start(handler http.Handler) {
-	log.Println("Starting server on 0.0.0.0:3001")
+	log.Info().Str("listen_address", listenAddr).Msg("starting server")
 
 	s.srv.Handler = cors(handler)
 
 	if err := s.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("listen error: %+v", err)
+		log.Fatal().Err(err).Msg("listen error")
 	}
 }
 
@@ -63,19 +65,19 @@ func (s *Server) Shutdown(timeout time.Duration) {
 	defer cancel()
 
 	if err := s.srv.Shutdown(ctx); err != nil {
-		log.Fatalf("Server Shutdown Failed:%+v", err)
+		log.Fatal().Err(err).Msg("server shutdown failed")
 	}
 
-	log.Println("Server stopped")
+	log.Info().Msg("server stopped")
 }
 
 func (s *Server) Close() {
 	if err := s.Directory.Close(); err != nil {
-		log.Println("failed to close directory connection:", err)
+		log.Err(err).Msg("failed to close directory connection")
 	}
 
 	if err := s.Store.Close(); err != nil {
-		log.Println("failed to close data store", err)
+		log.Err(err).Msg("failed to close data store")
 	}
 }
 
@@ -84,7 +86,7 @@ func (s *Server) GetUser(w http.ResponseWriter, r *http.Request) {
 
 	userObj, err := s.getUser(r.Context(), userID)
 	if err != nil {
-		log.Println("Failed to get user:", err)
+		log.Err(err).Msg("failed to get user")
 		http.Error(w, "failed to get user", http.StatusInternalServerError)
 		return
 	}

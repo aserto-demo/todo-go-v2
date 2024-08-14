@@ -3,10 +3,11 @@ package store
 
 import (
 	"database/sql"
-	"log"
 	"os"
 
 	"github.com/blockloop/scan"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -110,14 +111,14 @@ func (s *Store) loadTodos(id string) ([]Todo, error) {
 }
 
 func NewStore() (*Store, error) {
-	log.Println("Creating todo.db...")
+	log.Trace().Msg("Creating todo.db...")
 	if _, fileExistsError := os.Stat(dbPath); os.IsNotExist(fileExistsError) {
 		file, err := os.Create(dbPath)
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Fatal().Err(err).Msg("failed to create todo.db")
 		}
 		file.Close()
-		log.Println("todo.db created")
+		log.Trace().Msg("todo.db created")
 	}
 
 	sqliteDatabase, _ := sql.Open("sqlite3", dbPath) // Open the created SQLite File
@@ -130,17 +131,16 @@ func NewStore() (*Store, error) {
 }
 
 func createTodosTable(db *sql.DB) error {
-	log.Println("Create todos table...")
+	log.Trace().Msg("Create todos table...")
 
 	statement, err := db.Prepare(createTodoTableSQL) // Prepare SQL Statement
 	if err != nil {
-		log.Fatal(err.Error())
+		return errors.Wrap(err, "failed to prepare sql statement")
 	}
-	_, execErr := statement.Exec()
-	if execErr != nil {
-		log.Fatal(execErr.Error())
-		return execErr
+
+	if _, err := statement.Exec(); err != nil {
+		return errors.Wrap(err, "failed to create todos table")
 	}
-	log.Println("todos table created")
+	log.Trace().Msg("todos table created")
 	return nil
 }

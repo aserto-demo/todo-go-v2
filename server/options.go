@@ -1,13 +1,14 @@
 package server
 
 import (
-	"log"
 	"os"
 
 	"github.com/aserto-dev/go-aserto"
 	"github.com/aserto-dev/go-aserto/ds/v3"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 type Options struct {
@@ -20,6 +21,8 @@ type Options struct {
 	OidcIssuer   string
 	OidcAudience string
 	OidcJwksURL  string
+
+	LogLevel zerolog.Level
 }
 
 func LoadOptions() (*Options, error) {
@@ -29,11 +32,14 @@ func LoadOptions() (*Options, error) {
 
 	authorizerAddr := getEnvOr("ASERTO_AUTHORIZER_SERVICE_URL", "localhost:8282")
 	directoryAddr := getEnvOr("ASERTO_DIRECTORY_SERVICE_URL", "localhost:9292")
+	asertoLogLevel := getEnvOr("ASERTO_LOG_LEVEL", "info")
 
-	log.Printf("Authorizer: %s\n", authorizerAddr)
-	log.Printf("Directory:  %s\n", directoryAddr)
+	logLevel, err := zerolog.ParseLevel(asertoLogLevel)
+	if err != nil {
+		return nil, errors.Wrapf(err, "invalid log level [%s] in ASERTO_LOG_LEVEL", asertoLogLevel)
+	}
 
-	return &Options{
+	options := &Options{
 		Authorizer: &aserto.Config{
 			Address:    authorizerAddr,
 			APIKey:     os.Getenv("ASERTO_AUTHORIZER_API_KEY"),
@@ -47,12 +53,29 @@ func LoadOptions() (*Options, error) {
 				CACertPath: os.ExpandEnv(getEnv("ASERTO_DIRECTORY_GRPC_CA_CERT_PATH", "ASERTO_GRPC_CA_CERT_PATH")),
 				TenantID:   os.Getenv("ASERTO_TENANT_ID"),
 			}},
+		PolicyName:   os.Getenv("ASERTO_POLICY_INSTANCE_NAME"),
+		PolicyRoot:   getEnvOr("ASERTO_POLICY_ROOT", "todoApp"),
 		OidcIssuer:   getEnvOr("ISSUER", "https://citadel.demo.aserto.com/dex"),
 		OidcAudience: getEnvOr("AUDIENCE", "citadel-app"),
 		OidcJwksURL:  getEnvOr("JWKS_URL", "https://citadel.demo.aserto.com/dex/keys"),
-		PolicyName:   os.Getenv("ASERTO_POLICY_INSTANCE_NAME"),
-		PolicyRoot:   getEnvOr("ASERTO_POLICY_ROOT", "todoApp"),
-	}, nil
+		LogLevel:     logLevel,
+	}
+
+	// Initialize logging.
+	initLogging(options.LogLevel)
+
+	log.Info().
+		Str("authorizer", options.Authorizer.Address).
+		Str("directory", options.Directory.Address).
+		Msg("options loaded")
+
+	return options, nil
+}
+
+func initLogging(level zerolog.Level) {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	zerolog.DefaultContextLogger = &log.Logger
+	zerolog.SetGlobalLevel(level)
 }
 
 func getEnvOr(v, defaultValue string) string {

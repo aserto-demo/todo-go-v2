@@ -3,7 +3,6 @@ package directory
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"todo-go/store"
 
@@ -14,6 +13,7 @@ import (
 	dsw "github.com/aserto-dev/go-directory/aserto/directory/writer/v3"
 	"github.com/aserto-dev/go-directory/pkg/derr"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -43,7 +43,7 @@ func NewDirectory(cfg *ds.Config) (*Directory, error) {
 func (d *Directory) GetUser(ctx context.Context, objID string) (*dsc.Object, error) {
 	resp, err := d.Reader.GetObject(ctx, &dsr.GetObjectRequest{ObjectType: "user", ObjectId: objID})
 	if err != nil {
-		log.Printf("Failed to get user [%s]: %s", objID, err)
+		log.Warn().Err(err).Msgf("failed to get user [%s]", objID)
 		return nil, err
 	}
 
@@ -60,10 +60,10 @@ func (d *Directory) UserFromIdentity(ctx context.Context, identity string) (*dsc
 	})
 	switch {
 	case errors.Is(cerr.UnwrapAsertoError(err), derr.ErrRelationNotFound):
-		log.Printf("identity not found [%s]", identity)
+		log.Warn().Msgf("identity not found [%s]", identity)
 		return nil, ErrNotFound
 	case err != nil:
-		log.Printf("Failed to get relations for identity [%+v]: %s", identity, err)
+		log.Err(err).Msgf("failed to get relations for identity [%s]", identity)
 		return nil, err
 	}
 
@@ -83,7 +83,7 @@ func (d *Directory) AddTodo(ctx context.Context, todo *Todo) error {
 			DisplayName: todo.Title,
 		},
 	}); err != nil {
-		log.Printf("Failed to create resource [%+v]: %s", todo.Title, err)
+		log.Err(err).Msgf("failed to create resource [%s]", todo.Title)
 		return err
 	}
 	if _, err := d.Writer.SetRelation(ctx, &dsw.SetRelationRequest{
@@ -95,7 +95,7 @@ func (d *Directory) AddTodo(ctx context.Context, todo *Todo) error {
 			ObjectId:    todo.ID,
 		},
 	}); err != nil {
-		log.Printf("Failed to set owner relation [%+v]: %s", todo.Title, err)
+		log.Err(err).Msgf("failed to set owner relation [%s]", todo.Title)
 		return err
 	}
 
@@ -108,7 +108,7 @@ func (d *Directory) DeleteTodo(ctx context.Context, id string) error {
 		ObjectId:      id,
 		WithRelations: true,
 	}); err != nil {
-		log.Printf("Failed to delete todo object [%+v]: %s", id, err)
+		log.Err(err).Msgf("failed to delete todo object [%s]", id)
 		return err
 	}
 

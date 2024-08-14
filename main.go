@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
-	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -11,37 +9,32 @@ import (
 	"todo-go/server"
 
 	"github.com/aserto-dev/go-aserto/middleware/gorillaz"
-	"github.com/rs/zerolog"
-
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
-	// Initialize logging
-	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
-	zerolog.DefaultContextLogger = &logger
-	zerolog.SetGlobalLevel(zerolog.DebugLevel)
-
+	// Load options from .env file.
 	options, err := server.LoadOptions()
 	if err != nil {
-		log.Fatalln("failed to load options:", err)
+		log.Fatal().Err(err).Msg("failed to load options")
 	}
 
 	// Initialize the Server
 	srv, err := server.New(options)
 	if err != nil {
-		log.Fatalln("failed to create server:", err)
+		log.Fatal().Err(err).Msg("failed to create server")
 	}
 	defer srv.Close()
 
 	// Create an authorizer client
 	azClient, err := NewAuthorizerClient(options.Authorizer)
 	if err != nil {
-		log.Fatalln("failed to create authorizer client:", err)
+		log.Fatal().Err(err).Msg("failed to create authorizer client")
 	}
 	defer azClient.Close()
 
-	// Create a context that is cancelled when SIGINT or SIGTERM is received
+	// Create a context that is cancelled when SIGINT or SIGTERM is received.
 	ctx, stop := signalContext()
 	defer stop()
 
@@ -51,6 +44,7 @@ func main() {
 	// This middleware authorizes incoming requests.
 	authz := AuthorizationMiddleware(azClient, options)
 
+	// Create the API router.
 	router := AppRouter(srv, authn, authz)
 
 	// Start the server
@@ -68,6 +62,7 @@ func main() {
 func AppRouter(srv *server.Server, authn mux.MiddlewareFunc, authz *gorillaz.Middleware) *mux.Router {
 	router := mux.NewRouter()
 
+	// Add authentication middleware to all routes.
 	router.Use(authn)
 
 	// Set up routes

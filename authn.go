@@ -38,7 +38,9 @@ func AuthenticationMiddleware(ctx context.Context, options *server.Options) mux.
 				return
 			}
 
-			next.ServeHTTP(w, r.WithContext(identity.WithSubject(r.Context(), token.Subject())))
+			ctxWithIdentity := identity.WithSubject(r.Context(), token.Subject())
+
+			next.ServeHTTP(w, r.WithContext(ctxWithIdentity))
 		})
 	}
 }

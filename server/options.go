@@ -26,8 +26,8 @@ type Options struct {
 }
 
 func LoadOptions() (*Options, error) {
-	if err := godotenv.Load(); err != nil {
-		return nil, errors.Wrap(err, "failed to load .env file")
+	if err := loadEnv(); err != nil {
+		return nil, err
 	}
 
 	authorizerAddr := getEnvOr("ASERTO_AUTHORIZER_SERVICE_URL", "localhost:8282")
@@ -70,6 +70,14 @@ func LoadOptions() (*Options, error) {
 		Msg("options loaded")
 
 	return options, nil
+}
+
+func loadEnv() error {
+	if _, err := os.Stat(".env"); errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+
+	return errors.Wrap(godotenv.Load(), "failed to load .env file")
 }
 
 func initLogging(level zerolog.Level) {

@@ -27,19 +27,19 @@ func main() {
 	}
 	defer srv.Close()
 
-	// Create an authorizer client
-	azClient, err := NewAuthorizerClient(options.Authorizer)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create authorizer client")
-	}
-	defer azClient.Close()
-
 	// Create a context that is cancelled when SIGINT or SIGTERM is received.
 	ctx, stop := signalContext()
 	defer stop()
 
 	// This middleware validates incoming JWTs and stores the subject name in the request context.
 	authn := AuthenticationMiddleware(ctx, options)
+
+	// Create an authorizer client
+	azClient, err := NewAuthorizerClient(options.Authorizer)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create authorizer client")
+	}
+	defer azClient.Close()
 
 	// This middleware authorizes incoming requests.
 	authz := AuthorizationMiddleware(azClient, options)

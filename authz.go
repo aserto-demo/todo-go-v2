@@ -13,7 +13,7 @@ import (
 )
 
 func NewAuthorizerClient(cfg *aserto.Config) (*az.Client, error) {
-	opts, err := cfg.ToConnectionOptions(aserto.NewDialOptionsProvider())
+	opts, err := cfg.ToConnectionOptions()
 	if err != nil {
 		return nil, err
 	}

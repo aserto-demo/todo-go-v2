@@ -55,9 +55,9 @@ func LoadOptions() (*Options, error) {
 			}},
 		PolicyName:   os.Getenv("ASERTO_POLICY_INSTANCE_NAME"),
 		PolicyRoot:   getEnvOr("ASERTO_POLICY_ROOT", "todoApp"),
-		OidcIssuer:   getEnvOr("ISSUER", "https://citadel.demo.aserto.com/dex"),
+		OidcIssuer:   getEnvOr("ISSUER", "https://citadel.authzen-interop.net/dex"),
 		OidcAudience: getEnvOr("AUDIENCE", "citadel-app"),
-		OidcJwksURL:  getEnvOr("JWKS_URL", "https://citadel.demo.aserto.com/dex/keys"),
+		OidcJwksURL:  getEnvOr("JWKS_URL", "https://citadel.authzen-interop.net/dex/keys"),
 		LogLevel:     logLevel,
 	}
 
